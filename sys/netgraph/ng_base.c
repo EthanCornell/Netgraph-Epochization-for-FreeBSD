@@ -279,6 +279,13 @@ static MALLOC_DEFINE(M_NETGRAPH_ITEM, "netgraph_item",
 	mtx_sleep(&ng_worklist, &ng_worklist_mtx, PI_NET, "sleep", 0)
 #define	NG_WORKLIST_WAKEUP()			\
 	wakeup_one(&ng_worklist)
+	// Define macros for initializing and locking the node type mutex
+	#define NODE_TYPE_INIT(type) 	\
+	mtx_init(&(type)->type_mtx, "ng_type_mtx", NULL, MTX_DEF)
+	#define NODE_TYPE_LOCK(type) 	\
+	mtx_lock(&(type)->type_mtx)
+	#define NODE_TYPE_UNLOCK(type) \
+	mtx_unlock(&(type)->type_mtx)
 
 #ifdef NETGRAPH_DEBUG /*----------------------------------------------*/
 /*
@@ -713,14 +720,18 @@ ng_make_node_common(struct ng_type *type, node_p *nodepp)
 void
 ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 {
+	struct epoch_tracker et;
 	hook_p hook;
+	NET_EPOCH_ENTER(et);
 
 	/* Check if it's already shutting down */
 	if ((node->nd_flags & NGF_CLOSING) != 0)
+		NET_EPOCH_EXIT(et);
 		return;
 
 	if (node == &ng_deadnode) {
 		printf ("shutdown called on deadnode\n");
+		NET_EPOCH_EXIT(et);
 		return;
 	}
 
@@ -766,6 +777,7 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 			 */
 			node->nd_flags &= ~(NGF_INVALID|NGF_CLOSING);
 			NG_NODE_UNREF(node); /* Assume they still have theirs */
+			NET_EPOCH_EXIT(et);
 			return;
 		}
 	} else {				/* do the default thing */
@@ -782,6 +794,15 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 	 * force a driver to 'linger' with a reference.
 	 */
 	NG_NODE_UNREF(node);
+	NET_EPOCH_EXIT(et);
+}
+
+static void
+ng_free_node_epoch(epoch_context_t ctx)
+{
+    node_p node = __containerof(ctx, struct ng_node, hook_epoch_ctx);
+    mtx_destroy(&node->nd_input_queue.q_mtx);
+    NG_FREE_NODE(node);
 }
 
 /*
@@ -798,8 +819,10 @@ ng_unref_node(node_p node)
 	CURVNET_SET(node->nd_vnet);
 
 	if (refcount_release(&node->nd_refs)) { /* we were the last */
-
+		NODE_TYPE_LOCK(node->nd_type);
 		node->nd_type->refs--; /* XXX maybe should get types lock? */
+		NODE_TYPE_UNLOCK(node->nd_type);
+
 		NAMEHASH_WLOCK();
 		if (NG_NODE_HAS_NAME(node)) {
 			V_ng_named_nodes--;
@@ -812,8 +835,7 @@ ng_unref_node(node_p node)
 		LIST_REMOVE(node, nd_idnodes);
 		IDHASH_WUNLOCK();
 
-		mtx_destroy(&node->nd_input_queue.q_mtx);
-		NG_FREE_NODE(node);
+		NET_EPOCH_CALL(ng_free_node_epoch, &node->hook_epoch_ctx);
 	}
 	CURVNET_RESTORE();
 }
@@ -1060,8 +1082,8 @@ ng_unref_hook(hook_p hook)
 	if (refcount_release(&hook->hk_refs)) { /* we were the last */
 		if (_NG_HOOK_NODE(hook)) /* it'll probably be ng_deadnode */
 			_NG_NODE_UNREF((_NG_HOOK_NODE(hook)));
-		//NG_FREE_HOOK(hook);
-		NET_EPOCH_CALL(ng_free_hook, &hook->hook_epoch_ctx);//hook_epoch_ctx is not defined
+
+		NET_EPOCH_CALL(ng_free_hook, &hook->hook_epoch_ctx);
 	}
 }
 

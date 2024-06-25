@@ -357,6 +357,7 @@ struct ng_queue {
 	u_int		q_flags;	/* Current r/w/q lock flags */
 	u_int		q_flags2;	/* Other queue flags */
 	struct mtx	q_mtx;
+	struct mtx type_mtx; 
 	STAILQ_ENTRY(ng_node)	q_work;	/* nodes with work to do */
 	STAILQ_HEAD(, ng_item)	queue;	/* actually items queue */
 };
