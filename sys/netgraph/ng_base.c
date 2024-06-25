@@ -2444,8 +2444,8 @@ ng_apply_item(node_p node, item_p item, int rw)
 
 	epoch_tracker et;
 
-  NET_EPOCH_ENTER(et);
-  NET_EPOCH_ASSERT();
+  	NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ASSERT();
 
 	/* Node and item are never optional. */
 	KASSERT(node != NULL, ("ng_apply_item: node is NULL"));
@@ -2596,8 +2596,8 @@ ng_generic_msg(node_p here, item_p item, hook_p lasthook)
 
 	epoch_tracker et;
 
-  NET_EPOCH_ENTER(et);
-  NET_EPOCH_ASSERT();
+  	NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ASSERT();
 
 	NGI_GET_MSG(item, msg);
 	if (msg->header.typecookie != NGM_GENERIC_COOKIE) {
@@ -3097,8 +3097,8 @@ void
 ng_free_item(item_p item)
 {
 	epoch_tracker et;
-  NET_EPOCH_ENTER(et);
-  NET_EPOCH_ASSERT();
+  	NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ASSERT();
 	/*
 	 * The item may hold resources on its own. We need to free
 	 * these before we can free the item. What they are depends upon
@@ -3433,7 +3433,7 @@ ng_dumpitems(void)
 	int i = 1;
 	epoch_tracker et;
 
-    NET_EPOCH_ENTER(et);
+    	NET_EPOCH_ENTER(et);
 	TAILQ_FOREACH(item, &ng_itemlist, all) {
 		printf("[%d] ", i++);
 		dumpitem(item, NULL, 0);
@@ -3737,7 +3737,7 @@ ng_address_path(node_p here, item_p item, const char *address, ng_ID_t retaddr)
 
 	ITEM_DEBUG_CHECKS;
 	epoch_tracker et;
-  NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ENTER(et);
 	/*
 	 * Note that ng_path2noderef increments the reference count
 	 * on the node for us if it finds one. So we don't have to.
@@ -3764,7 +3764,7 @@ ng_address_ID(node_p here, item_p item, ng_ID_t ID, ng_ID_t retaddr)
 
 	ITEM_DEBUG_CHECKS;
 	epoch_tracker et;
-  NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ENTER(et);
 	/*
 	 * Find the target node.
 	 */
@@ -3793,7 +3793,7 @@ ng_package_msg_self(node_p here, hook_p hook, struct ng_mesg *msg)
 {
 	item_p item;
 	struct epoch_tracker et;
-  NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ENTER(et);
 
 	/*
 	 * Find the target node.
@@ -3837,7 +3837,7 @@ ng_send_fn1(node_p node, hook_p hook, ng_item_fn *fn, void * arg1, int arg2,
 {
 	item_p item;
 	struct epoch_tracker et;
-  NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ENTER(et);
 
 	if ((item = ng_alloc_item(NGQF_FN, flags)) == NULL) {
 		NET_EPOCH_EXIT(et);
@@ -3854,7 +3854,7 @@ ng_send_fn1(node_p node, hook_p hook, ng_item_fn *fn, void * arg1, int arg2,
 	NGI_ARG1(item) = arg1;
 	NGI_ARG2(item) = arg2;
 	int ret = ng_snd_item(item, flags);
-  NET_EPOCH_EXIT(et);
+  	NET_EPOCH_EXIT(et);
 	return(ret);
 }
 
@@ -3872,7 +3872,7 @@ ng_send_fn2(node_p node, hook_p hook, item_p pitem, ng_item_fn2 *fn, void *arg1,
 {
 	item_p item;
 	struct epoch_tracker et;
-  NET_EPOCH_ENTER(et);
+  	NET_EPOCH_ENTER(et);
 	NET_EPOCH_ASSERT();
 
 	KASSERT((pitem != NULL || (flags & NG_REUSE_ITEM) == 0),
