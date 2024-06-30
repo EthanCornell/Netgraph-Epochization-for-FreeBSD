@@ -52,6 +52,7 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/refcount.h>
+#include <sys/epoch.h>
 
 #ifdef HAVE_KERNEL_OPTION_HEADERS
 #include "opt_netgraph.h"
@@ -122,7 +123,7 @@ struct ng_hook {
 	ng_rcvmsg_t	*hk_rcvmsg;	/* control messages come here */
 	ng_rcvdata_t	*hk_rcvdata;	/* data comes here */
 	int	hk_refs;		/* dont actually free this till 0 */
-	epoch_context_t hook_epoch_ctx; /* epoch context for safe freeing */
+	struct epoch_context hook_epoch_ctx; /* epoch context for safe freeing */
 #ifdef	NETGRAPH_DEBUG /*----------------------------------------------*/
 #define HK_MAGIC 0x78573011
 	int	hk_magic;
@@ -357,7 +358,7 @@ struct ng_queue {
 	u_int		q_flags;	/* Current r/w/q lock flags */
 	u_int		q_flags2;	/* Other queue flags */
 	struct mtx	q_mtx;
-	struct mtx type_mtx; 
+	struct mtx type_mtx;
 	STAILQ_ENTRY(ng_node)	q_work;	/* nodes with work to do */
 	STAILQ_HEAD(, ng_item)	queue;	/* actually items queue */
 };
@@ -375,6 +376,7 @@ struct ng_node {
 	struct	ng_queue	  nd_input_queue; /* input queue for locking */
 	int	nd_refs;		/* # of references to this node */
 	struct	vnet		 *nd_vnet;	/* network stack instance */
+	struct epoch_context hook_epoch_ctx; /* epoch context for safe freeing */
 #ifdef	NETGRAPH_DEBUG /*----------------------------------------------*/
 #define ND_MAGIC 0x59264837
 	int	nd_magic;
@@ -1080,7 +1082,7 @@ struct ng_type {
 	ng_connect_t	*connect;	/* final notification of new hook */
 	ng_rcvdata_t	*rcvdata;	/* data comes here */
 	ng_disconnect_t	*disconnect;	/* notify on disconnect */
-
+	struct mtx type_mtx; /* type_mtx member */
 	const struct	ng_cmdlist *cmdlist;	/* commands we can convert */
 
 	/* R/W data private to the base netgraph code DON'T TOUCH! */

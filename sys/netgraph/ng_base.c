@@ -131,7 +131,7 @@ struct ng_node ng_deadnode = {
 		0,
 		{}, /* should never use! (should hang) */
 		{}, /* workqueue entry */
-		STAILQ_HEAD_INITIALIZER(ng_deadnode.nd_input_queue.queue),
+		//STAILQ_HEAD_INITIALIZER(ng_deadnode.nd_input_queue.queue),
 	},
 	1,	/* refs */
 	NULL,	/* vnet */
@@ -279,12 +279,12 @@ static MALLOC_DEFINE(M_NETGRAPH_ITEM, "netgraph_item",
 	mtx_sleep(&ng_worklist, &ng_worklist_mtx, PI_NET, "sleep", 0)
 #define	NG_WORKLIST_WAKEUP()			\
 	wakeup_one(&ng_worklist)
-	// Define macros for initializing and locking the node type mutex
-	#define NODE_TYPE_INIT(type) 	\
+// Define macros for initializing and locking the node type mutex
+#define NODE_TYPE_INIT(type) 			\
 	mtx_init(&(type)->type_mtx, "ng_type_mtx", NULL, MTX_DEF)
-	#define NODE_TYPE_LOCK(type) 	\
+#define NODE_TYPE_LOCK(type) 			\
 	mtx_lock(&(type)->type_mtx)
-	#define NODE_TYPE_UNLOCK(type) \
+#define NODE_TYPE_UNLOCK(type) 			\
 	mtx_unlock(&(type)->type_mtx)
 
 #ifdef NETGRAPH_DEBUG /*----------------------------------------------*/
@@ -800,7 +800,7 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 static void
 ng_free_node_epoch(epoch_context_t ctx)
 {
-    node_p node = __containerof(ctx, struct ng_node, hook_epoch_ctx);
+    struct ng_node *node = __containerof(ctx, struct ng_node, hook_epoch_ctx);
     mtx_destroy(&node->nd_input_queue.q_mtx);
     NG_FREE_NODE(node);
 }
@@ -1065,7 +1065,7 @@ ng_ID_rehash(void)
 ************************************************************************/
 static void
 ng_free_hook(epoch_context_t ctx) {
-    hook_p *hook = __containerof(ctx, struct hook_p, hook_epoch_ctx);
+    struct ng_hook *hook = __containerof(ctx, struct ng_hook, hook_epoch_ctx);
     NG_FREE_HOOK(hook);
 }
 
@@ -1814,7 +1814,7 @@ ng_path2noderef(node_p here, const char *address, node_p *destp,
 	char   *nodename, *path;
 	node_p  node, oldnode;
 
-	epoch_tracker et;
+	struct epoch_tracker et;
 
 	NET_EPOCH_ENTER(et);
 
@@ -2464,7 +2464,7 @@ ng_apply_item(node_p node, item_p item, int rw)
 	struct ng_apply_info *apply;
 	int	error = 0, depth;
 
-	epoch_tracker et;
+	struct epoch_tracker et;
 
   	NET_EPOCH_ENTER(et);
   	NET_EPOCH_ASSERT();
@@ -2616,7 +2616,7 @@ ng_generic_msg(node_p here, item_p item, hook_p lasthook)
 	struct ng_mesg *msg;
 	struct ng_mesg *resp = NULL;
 
-	epoch_tracker et;
+	struct epoch_tracker et;
 
   	NET_EPOCH_ENTER(et);
   	NET_EPOCH_ASSERT();
@@ -3118,7 +3118,7 @@ ng_alloc_item(int type, int flags)
 void
 ng_free_item(item_p item)
 {
-	epoch_tracker et;
+	struct epoch_tracker et;
   	NET_EPOCH_ENTER(et);
   	NET_EPOCH_ASSERT();
 	/*
@@ -3170,7 +3170,7 @@ ng_realloc_item(item_p pitem, int type, int flags)
 	item_p item;
 	int from, to;
 
-	epoch_tracker et;
+	struct epoch_tracker et;
 
 	KASSERT((pitem != NULL), ("%s: can't reallocate NULL", __func__));
 	KASSERT(((type & ~NGQF_TYPE) == 0),
@@ -3453,7 +3453,7 @@ ng_dumpitems(void)
 {
 	item_p item;
 	int i = 1;
-	epoch_tracker et;
+	struct epoch_tracker et;
 
     	NET_EPOCH_ENTER(et);
 	TAILQ_FOREACH(item, &ng_itemlist, all) {
@@ -3724,8 +3724,8 @@ ng_address_hook(node_p here, item_p item, hook_p hook, ng_ID_t retaddr)
 	 * that the peer node is present, though maybe invalid.
 	 */
 	//TOPOLOGY_RLOCK();
-	epoch_tracker et;
-  NET_EPOCH_ENTER(et);
+	struct epoch_tracker et;
+  	NET_EPOCH_ENTER(et);
 	if ((hook == NULL) || NG_HOOK_NOT_VALID(hook) ||
 	    NG_HOOK_NOT_VALID(peer = NG_HOOK_PEER(hook)) ||
 	    NG_NODE_NOT_VALID(peernode = NG_PEER_NODE(hook))) {
@@ -3758,7 +3758,7 @@ ng_address_path(node_p here, item_p item, const char *address, ng_ID_t retaddr)
 	int	error;
 
 	ITEM_DEBUG_CHECKS;
-	epoch_tracker et;
+	struct epoch_tracker et;
   	NET_EPOCH_ENTER(et);
 	/*
 	 * Note that ng_path2noderef increments the reference count
@@ -3785,7 +3785,7 @@ ng_address_ID(node_p here, item_p item, ng_ID_t ID, ng_ID_t retaddr)
 	node_p dest;
 
 	ITEM_DEBUG_CHECKS;
-	epoch_tracker et;
+	struct epoch_tracker et;
   	NET_EPOCH_ENTER(et);
 	/*
 	 * Find the target node.
