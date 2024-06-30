@@ -131,7 +131,6 @@ struct ng_node ng_deadnode = {
 		0,
 		{}, /* should never use! (should hang) */
 		{}, /* workqueue entry */
-		//STAILQ_HEAD_INITIALIZER(ng_deadnode.nd_input_queue.queue),
 	},
 	1,	/* refs */
 	NULL,	/* vnet */
