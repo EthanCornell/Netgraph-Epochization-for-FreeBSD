@@ -1265,19 +1265,7 @@ finish_vnet_shutdown:
 static int
 if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 {
-#ifdef DEV_BPF
-	u_int bif_dlt, bif_hdrlen;
-#endif
 	int rc;
-
-#ifdef DEV_BPF
- 	/*
-	 * if_detach_internal() will call the eventhandler to notify
-	 * interface departure.  That will detach if_bpf.  We need to
-	 * safe the dlt and hdrlen so we can re-attach it later.
-	 */
-	bpf_get_bp_params(ifp->if_bpf, &bif_dlt, &bif_hdrlen);
-#endif
 
 	/*
 	 * Detach from current vnet, but preserve LLADDR info, do not
@@ -1300,12 +1288,6 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	 */
 	CURVNET_SET_QUIET(new_vnet);
 	if_attach_internal(ifp, true);
-
-#ifdef DEV_BPF
-	if (ifp->if_bpf == NULL)
-		bpfattach(ifp, bif_dlt, bif_hdrlen);
-#endif
-
 	CURVNET_RESTORE();
 	return (0);
 }
@@ -2410,6 +2392,7 @@ const struct ifcap_nv_bit_name ifcap_nv_bit_names[] = {
 const struct ifcap_nv_bit_name ifcap2_nv_bit_names[] = {
 	CAP2NV(RXTLS4),
 	CAP2NV(RXTLS6),
+	CAP2NV(IPSEC_OFFLOAD),
 	{0, NULL}
 };
 #undef CAPNV
@@ -5165,6 +5148,12 @@ void *
 if_getl2com(if_t ifp)
 {
 	return (ifp->if_l2com);
+}
+
+void
+if_setipsec_accel_methods(if_t ifp, const struct if_ipsec_accel_methods *m)
+{
+	ifp->if_ipsec_accel_m = m;
 }
 
 #ifdef DDB
