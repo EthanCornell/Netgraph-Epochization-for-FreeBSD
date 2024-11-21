@@ -78,6 +78,7 @@ static struct hdspe_clock_source hdspe_clock_source_table_aio[] = {
 
 static struct hdspe_channel chan_map_aio[] = {
 	{ HDSPE_CHAN_AIO_LINE,    "line" },
+	{ HDSPE_CHAN_AIO_EXT,      "ext" },
 	{ HDSPE_CHAN_AIO_PHONE,  "phone" },
 	{ HDSPE_CHAN_AIO_AES,      "aes" },
 	{ HDSPE_CHAN_AIO_SPDIF, "s/pdif" },
@@ -577,7 +578,7 @@ hdspe_attach(device_t dev)
 		return (ENXIO);
 
 	for (i = 0; i < HDSPE_MAX_CHANS && chan_map[i].descr != NULL; i++) {
-		scp = malloc(sizeof(struct sc_pcminfo), M_DEVBUF, M_NOWAIT | M_ZERO);
+		scp = malloc(sizeof(struct sc_pcminfo), M_DEVBUF, M_WAITOK | M_ZERO);
 		scp->hc = &chan_map[i];
 		scp->sc = sc;
 		scp->dev = device_add_child(dev, "pcm", DEVICE_UNIT_ANY);
@@ -623,6 +624,12 @@ hdspe_attach(device_t dev)
 	    "Force sample rate (32000, 44100, 48000, ... 192000)");
 
 	return (bus_generic_attach(dev));
+}
+
+static void
+hdspe_child_deleted(device_t dev, device_t child)
+{
+	free(device_get_ivars(child), M_DEVBUF);
 }
 
 static void
@@ -672,6 +679,7 @@ static device_method_t hdspe_methods[] = {
 	DEVMETHOD(device_probe,     hdspe_probe),
 	DEVMETHOD(device_attach,    hdspe_attach),
 	DEVMETHOD(device_detach,    hdspe_detach),
+	DEVMETHOD(bus_child_deleted, hdspe_child_deleted),
 	{ 0, 0 }
 };
 

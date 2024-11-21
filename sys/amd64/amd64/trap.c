@@ -599,6 +599,18 @@ trap(struct trapframe *frame)
 			 */
 		case T_BPTFLT:
 			/*
+			 * Most likely, EFI RT hitting INT3.  This
+			 * check prevents kdb from handling
+			 * breakpoints set on the BIOS text, if such
+			 * option is ever needed.
+			 */
+			if ((td->td_pflags & TDP_EFIRT) != 0 &&
+			    curpcb->pcb_onfault != NULL) {
+				frame->tf_rip = (long)curpcb->pcb_onfault;
+				return;
+			}
+
+			/*
 			 * If KDB is enabled, let it handle the debugger trap.
 			 * Otherwise, debugger traps "can't happen".
 			 */
@@ -723,7 +735,7 @@ trap_pfault(struct trapframe *frame, bool usermode, int *signo, int *ucode)
 		 * Due to both processor errata and lazy TLB invalidation when
 		 * access restrictions are removed from virtual pages, memory
 		 * accesses that are allowed by the physical mapping layer may
-		 * nonetheless cause one spurious page fault per virtual page. 
+		 * nonetheless cause one spurious page fault per virtual page.
 		 * When the thread is executing a "no faulting" section that
 		 * is bracketed by vm_fault_{disable,enable}_pagefaults(),
 		 * every page fault is treated as a spurious page fault,

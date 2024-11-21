@@ -1041,6 +1041,11 @@ cxgb_port_attach(device_t dev)
 		if_sethwassistbits(ifp, 0, CSUM_TSO);
 	}
 
+	/* Create a list of media supported by this port */
+	ifmedia_init(&p->media, IFM_IMASK, cxgb_media_change,
+	    cxgb_media_status);
+	cxgb_build_medialist(p);
+
 	ether_ifattach(ifp, p->hw_addr);
 
 	/* Attach driver debugnet methods. */
@@ -1055,11 +1060,6 @@ cxgb_port_attach(device_t dev)
 		return (err);
 	}
 
-	/* Create a list of media supported by this port */
-	ifmedia_init(&p->media, IFM_IMASK, cxgb_media_change,
-	    cxgb_media_status);
-	cxgb_build_medialist(p);
-      
 	t3_sge_init_port(p);
 
 	return (err);
@@ -2472,9 +2472,7 @@ set_eeprom(struct port_info *pi, const uint8_t *data, int len, int offset)
 	aligned_len = (len + (offset & 3) + 3) & ~3;
 
 	if (aligned_offset != offset || aligned_len != len) {
-		buf = malloc(aligned_len, M_DEVBUF, M_WAITOK|M_ZERO);		   
-		if (!buf)
-			return (ENOMEM);
+		buf = malloc(aligned_len, M_DEVBUF, M_WAITOK | M_ZERO);
 		err = t3_seeprom_read(adapter, aligned_offset, (u32 *)buf);
 		if (!err && aligned_len > 4)
 			err = t3_seeprom_read(adapter,

@@ -59,10 +59,10 @@
 #include <dev/ofw/ofw_bus_subr.h>
 #endif
 
-char machine[] = "riscv";
+const char machine[] = "riscv";
 
-SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD | CTLFLAG_CAPRD, machine, 0,
-    "Machine class");
+SYSCTL_CONST_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD | CTLFLAG_CAPRD,
+    machine, "Machine class");
 
 /* Hardware implementation info. These values may be empty. */
 register_t mvendorid;	/* The CPU's JEDEC vendor ID */
@@ -72,6 +72,7 @@ register_t mimpid;	/* The implementation ID */
 u_int mmu_caps;
 
 /* Supervisor-mode extension support. */
+bool has_hyp;
 bool __read_frequently has_sstc;
 bool __read_frequently has_sscofpmf;
 bool has_svpbmt;
@@ -245,9 +246,11 @@ parse_riscv_isa(struct cpu_desc *desc, char *isa, int len)
 	while (i < len) {
 		switch(isa[i]) {
 		case 'a':
+		case 'b':
 		case 'c':
 		case 'd':
 		case 'f':
+		case 'h':
 		case 'i':
 		case 'm':
 			desc->isa_extensions |= HWCAP_ISA_BIT(isa[i]);
@@ -413,6 +416,7 @@ update_global_capabilities(u_int cpu, struct cpu_desc *desc)
 	UPDATE_CAP(mmu_caps, desc->mmu_caps);
 
 	/* Supervisor-mode extension support. */
+	UPDATE_CAP(has_hyp, (desc->isa_extensions & HWCAP_ISA_H) != 0);
 	UPDATE_CAP(has_sstc, (desc->smode_extensions & SV_SSTC) != 0);
 	UPDATE_CAP(has_sscofpmf, (desc->smode_extensions & SV_SSCOFPMF) != 0);
 	UPDATE_CAP(has_svpbmt, (desc->smode_extensions & SV_SVPBMT) != 0);
@@ -513,6 +517,7 @@ printcpuinfo(u_int cpu)
 		    "\03Compressed"
 		    "\04Double"
 		    "\06Float"
+		    "\10Hypervisor"
 		    "\15Mult/Div");
 	}
 

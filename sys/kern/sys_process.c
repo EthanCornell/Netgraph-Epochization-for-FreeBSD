@@ -36,6 +36,7 @@
 #include <sys/ktr.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
+#include <sys/mman.h>
 #include <sys/mutex.h>
 #include <sys/reg.h>
 #include <sys/syscallsubr.h>
@@ -360,6 +361,12 @@ proc_rwmem(struct proc *p, struct uio *uio)
 	reqprot = writing ? VM_PROT_COPY | VM_PROT_READ : VM_PROT_READ;
 	fault_flags = writing ? VM_FAULT_DIRTY : VM_FAULT_NORMAL;
 
+	if (writing) {
+		error = priv_check_cred(p->p_ucred, PRIV_PROC_MEM_WRITE);
+		if (error)
+			return (error);
+	}
+
 	/*
 	 * Only map in one page at a time.  We don't have to, but it
 	 * makes things easier.  This way is trivial - right?
@@ -505,7 +512,8 @@ ptrace_vm_entry(struct thread *td, struct proc *p, struct ptrace_vm_entry *pve)
 		pve->pve_start = entry->start;
 		pve->pve_end = entry->end - 1;
 		pve->pve_offset = entry->offset;
-		pve->pve_prot = entry->protection;
+		pve->pve_prot = entry->protection |
+		    PROT_MAX(entry->max_protection);
 
 		/* Backing object's path needed? */
 		if (pve->pve_pathlen == 0)

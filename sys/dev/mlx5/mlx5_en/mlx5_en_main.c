@@ -30,12 +30,14 @@
 #include "opt_ratelimit.h"
 
 #include <dev/mlx5/mlx5_en/en.h>
+#include <dev/mlx5/mlx5_accel/ipsec.h>
 
 #include <sys/eventhandler.h>
 #include <sys/sockio.h>
 #include <machine/atomic.h>
 
 #include <net/debugnet.h>
+#include <netinet/tcp_ratelimit.h>
 #include <netipsec/keydb.h>
 #include <netipsec/ipsec_offload.h>
 
@@ -1323,6 +1325,8 @@ mlx5e_destroy_rq(struct mlx5e_rq *rq)
 	wq_sz = mlx5_wq_ll_get_size(&rq->wq);
 	for (i = 0; i != wq_sz; i++) {
 		if (rq->mbuf[i].mbuf != NULL) {
+			if (rq->mbuf[i].ipsec_mtag != NULL)
+				m_tag_free(&rq->mbuf[i].ipsec_mtag->tag);
 			bus_dmamap_unload(rq->dma_tag, rq->mbuf[i].dma_map);
 			m_freem(rq->mbuf[i].mbuf);
 		}
@@ -4531,17 +4535,29 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	if_setcapabilitiesbit(ifp, IFCAP_TSO | IFCAP_VLAN_HWTSO, 0);
 	if_setcapabilitiesbit(ifp, IFCAP_HWSTATS | IFCAP_HWRXTSTMP, 0);
 	if_setcapabilitiesbit(ifp, IFCAP_MEXTPG, 0);
-	if_setcapabilitiesbit(ifp, IFCAP_TXTLS4 | IFCAP_TXTLS6, 0);
+#ifdef KERN_TLS
+	if (MLX5_CAP_GEN(mdev, tls_tx) != 0 &&
+	    MLX5_CAP_GEN(mdev, log_max_dek) != 0)
+		if_setcapabilitiesbit(ifp, IFCAP_TXTLS4 | IFCAP_TXTLS6, 0);
+	if (MLX5_CAP_GEN(mdev, tls_rx) != 0 &&
+	    MLX5_CAP_GEN(mdev, log_max_dek) != 0 &&
+	    MLX5_CAP_FLOWTABLE_NIC_RX(mdev,
+	    ft_field_support.outer_ip_version) != 0)
+		if_setcapabilities2bit(ifp, IFCAP2_BIT(IFCAP2_RXTLS4) |
+		    IFCAP2_BIT(IFCAP2_RXTLS6), 0);
+#endif
 #ifdef RATELIMIT
-	if_setcapabilitiesbit(ifp, IFCAP_TXRTLMT | IFCAP_TXTLS_RTLMT, 0);
+	if (MLX5_CAP_GEN(mdev, qos) &&
+	    MLX5_CAP_QOS(mdev, packet_pacing))
+		if_setcapabilitiesbit(ifp, IFCAP_TXRTLMT | IFCAP_TXTLS_RTLMT,
+		    0);
 #endif
 	if_setcapabilitiesbit(ifp, IFCAP_VXLAN_HWCSUM | IFCAP_VXLAN_HWTSO, 0);
-	if_setcapabilities2bit(ifp, IFCAP2_BIT(IFCAP2_RXTLS4) |
-	    IFCAP2_BIT(IFCAP2_RXTLS6), 0);
-
+#ifdef IPSEC_OFFLOAD
 	if (mlx5_ipsec_device_caps(mdev) & MLX5_IPSEC_CAP_PACKET_OFFLOAD)
 		if_setcapabilities2bit(ifp, IFCAP2_BIT(IFCAP2_IPSEC_OFFLOAD),
 		    0);
+#endif
 
 	if_setsndtagallocfn(ifp, mlx5e_snd_tag_alloc);
 #ifdef RATELIMIT
@@ -4876,7 +4892,12 @@ mlx5e_destroy_ifp(struct mlx5_core_dev *mdev, void *vpriv)
 
 #ifdef RATELIMIT
 	/*
-	 * The kernel can have reference(s) via the m_snd_tag's into
+	 * Tell the TCP ratelimit code to release the rate-sets attached
+	 * to our ifnet.
+	 */
+	tcp_rl_release_ifnet(ifp);
+	/*
+	 * The kernel can still have reference(s) via the m_snd_tag's into
 	 * the ratelimit channels, and these must go away before
 	 * detaching:
 	 */

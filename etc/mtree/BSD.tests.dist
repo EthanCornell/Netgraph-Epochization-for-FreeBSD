@@ -427,6 +427,8 @@
         ..
         libkvm
         ..
+        libmd
+        ..
         libmp
         ..
         libnv
@@ -791,6 +793,10 @@
         ..
         compat32
         ..
+        cam
+            ctl
+            ..
+        ..
         devrandom
         ..
         dtrace
@@ -847,6 +853,8 @@
             execve
             ..
             pipe
+            ..
+            tty
             ..
         ..
         kqueue
@@ -1090,6 +1098,8 @@
         dirname
         ..
         du
+        ..
+        env
         ..
         factor
         ..

@@ -220,12 +220,11 @@ contrib/openzfs/module/os/freebsd/zfs/zfs_ioctl_os.c		optional zfs compile-with 
 contrib/openzfs/module/os/freebsd/zfs/zfs_racct.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zfs_vfsops.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zfs_vnops_os.c		optional zfs compile-with "${ZFS_C}"
-contrib/openzfs/module/os/freebsd/zfs/zfs_znode.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_znode_os.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zio_crypt.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zvol_os.c		optional zfs compile-with "${ZFS_C}"
 
 #zfs unicode support
-contrib/openzfs/module/unicode/uconv.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/unicode/u8_textprep.c		optional zfs compile-with "${ZFS_C}"
 
 #zfs checksums / zcommon
@@ -238,6 +237,7 @@ contrib/openzfs/module/zcommon/zfs_fletcher_superscalar.c		optional zfs compile-
 contrib/openzfs/module/zcommon/zfs_fletcher_superscalar4.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zcommon/zfs_namecheck.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zcommon/zfs_prop.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zcommon/zfs_valstr.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zcommon/zpool_prop.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zcommon/zprop_common.c		optional zfs compile-with "${ZFS_C}"
 
@@ -270,9 +270,11 @@ contrib/openzfs/module/zfs/dbuf.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dbuf_stats.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dataset_kstats.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/ddt.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/ddt_log.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/ddt_stats.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/ddt_zap.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dmu.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/dmu_direct.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dmu_diff.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dmu_object.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dmu_objset.c		optional zfs compile-with "${ZFS_C}"
@@ -369,6 +371,7 @@ contrib/openzfs/module/zfs/zfs_replay.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfs_rlock.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfs_sa.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfs_vnops.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_znode.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zstd/zfs_zstd.c		optional zfs zstdio compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zil.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zio.c		optional zfs compile-with "${ZFS_C}"
@@ -754,6 +757,7 @@ dev/acpi_support/acpi_fujitsu.c	optional acpi_fujitsu acpi
 dev/acpi_support/acpi_hp.c	optional acpi_hp acpi
 dev/acpi_support/acpi_ibm.c	optional acpi_ibm acpi
 dev/acpi_support/acpi_panasonic.c optional acpi_panasonic acpi
+dev/acpi_support/acpi_sbl_wmi.c	optional acpi_sbl_wmi acpi
 dev/acpi_support/acpi_sony.c	optional acpi_sony acpi
 dev/acpi_support/acpi_toshiba.c	optional acpi_toshiba acpi
 dev/acpi_support/atk0110.c	optional aibs acpi
@@ -1727,13 +1731,17 @@ dev/gve/gve_adminq.c		optional gve
 dev/gve/gve_main.c		optional gve
 dev/gve/gve_qpl.c		optional gve
 dev/gve/gve_rx.c		optional gve
+dev/gve/gve_rx_dqo.c		optional gve
 dev/gve/gve_sysctl.c		optional gve
 dev/gve/gve_tx.c		optional gve
+dev/gve/gve_tx_dqo.c		optional gve
 dev/gve/gve_utils.c		optional gve
 dev/goldfish/goldfish_rtc.c	optional goldfish_rtc fdt
+dev/gpio/acpi_gpiobus.c		optional acpi gpio
 dev/gpio/dwgpio/dwgpio.c	optional gpio dwgpio fdt
 dev/gpio/dwgpio/dwgpio_bus.c	optional gpio dwgpio fdt
 dev/gpio/dwgpio/dwgpio_if.m	optional gpio dwgpio fdt
+dev/gpio/gpioaei.c		optional acpi gpio
 dev/gpio/gpiobacklight.c	optional gpiobacklight fdt
 dev/gpio/gpiokeys.c		optional gpiokeys fdt
 dev/gpio/gpiokeys_codes.c	optional gpiokeys fdt
@@ -3811,7 +3819,7 @@ kern/kern_idle.c		standard
 kern/kern_intr.c		standard
 kern/kern_jail.c		standard
 kern/kern_kcov.c		optional kcov			\
-	compile-with "${NORMAL_C:N-fsanitize*} ${NORMAL_C:M-fsanitize=kernel-memory}"
+	compile-with "${NOSAN_C} ${MSAN_CFLAGS}"
 kern/kern_khelp.c		standard
 kern/kern_kthread.c		standard
 kern/kern_ktr.c			optional ktr
@@ -3879,7 +3887,7 @@ kern/stack_protector.c		standard \
 kern/subr_acl_nfs4.c		optional ufs_acl | zfs
 kern/subr_acl_posix1e.c		optional ufs_acl
 kern/subr_asan.c		optional kasan \
-	compile-with "${NORMAL_C:N-fsanitize*:N-fstack-protector*}"
+	compile-with "${NOSAN_C:N-fstack-protector*}"
 kern/subr_autoconf.c		standard
 kern/subr_blist.c		standard
 kern/subr_boot.c		standard
@@ -3891,10 +3899,10 @@ kern/subr_clock.c		standard
 kern/subr_compressor.c		standard \
 	compile-with "${NORMAL_C} -I$S/contrib/zstd/lib/freebsd"
 kern/subr_coverage.c		optional coverage \
-	compile-with "${NORMAL_C:N-fsanitize*:N-fno-sanitize*}"
+	compile-with "${NOSAN_C}"
 kern/subr_counter.c		standard
 kern/subr_csan.c		optional kcsan \
-	compile-with "${NORMAL_C:N-fsanitize*:N-fstack-protector*}"
+	compile-with "${NOSAN_C:N-fstack-protector*}"
 kern/subr_devstat.c		standard
 kern/subr_disk.c		standard
 kern/subr_early.c		standard
@@ -3914,7 +3922,7 @@ kern/subr_mchain.c		optional libmchain
 kern/subr_memdesc.c		standard
 kern/subr_module.c		standard
 kern/subr_msan.c		optional kmsan \
-	compile-with "${NORMAL_C:N-fsanitize*:N-fno-sanitize*:N-fstack-protector*}"
+	compile-with "${NOSAN_C:N-fstack-protector*}"
 kern/subr_msgbuf.c		standard
 kern/subr_param.c		standard
 kern/subr_pcpu.c		standard
@@ -4151,6 +4159,7 @@ net/bpf_jitter.c		optional bpf_jitter
 net/bpf_filter.c		optional bpf | netgraph_bpf
 net/bpf_zerocopy.c		optional bpf
 net/bridgestp.c			optional bridge | if_bridge
+net/dummymbuf.c			optional dummymbuf
 net/ieee8023ad_lacp.c		optional lagg
 net/if.c			standard
 net/ifq.c			standard
@@ -4257,6 +4266,7 @@ net80211/ieee80211_alq.c	optional wlan ieee80211_alq
 netgraph/bluetooth/common/ng_bluetooth.c optional netgraph_bluetooth
 netgraph/bluetooth/drivers/ubt/ng_ubt.c optional netgraph_bluetooth_ubt usb
 netgraph/bluetooth/drivers/ubt/ng_ubt_intel.c optional netgraph_bluetooth_ubt usb
+netgraph/bluetooth/drivers/ubt/ng_ubt_rtl.c optional netgraph_bluetooth_ubt usb
 netgraph/bluetooth/drivers/ubtbcmfw/ubtbcmfw.c optional netgraph_bluetooth_ubtbcmfw usb
 netgraph/bluetooth/hci/ng_hci_cmds.c optional netgraph_bluetooth_hci
 netgraph/bluetooth/hci/ng_hci_evnt.c optional netgraph_bluetooth_hci
@@ -5292,9 +5302,9 @@ xen/xenbus/xenbusb.c		optional xenhvm
 xen/xenbus/xenbusb_front.c	optional xenhvm
 xen/xenbus/xenbusb_back.c	optional xenhvm
 xen/xenmem/xenmem_if.m		optional xenhvm
-xdr/xdr.c			optional xdr | krpc | nfslockd | nfscl | nfsd
-xdr/xdr_array.c			optional xdr | krpc | nfslockd | nfscl | nfsd
-xdr/xdr_mbuf.c			optional xdr | krpc | nfslockd | nfscl | nfsd
-xdr/xdr_mem.c			optional xdr | krpc | nfslockd | nfscl | nfsd
-xdr/xdr_reference.c		optional xdr | krpc | nfslockd | nfscl | nfsd
-xdr/xdr_sizeof.c		optional xdr | krpc | nfslockd | nfscl | nfsd
+xdr/xdr.c			optional xdr | krpc | nfslockd | nfscl | nfsd | zfs
+xdr/xdr_array.c			optional xdr | krpc | nfslockd | nfscl | nfsd | zfs
+xdr/xdr_mbuf.c			optional xdr | krpc | nfslockd | nfscl | nfsd | zfs
+xdr/xdr_mem.c			optional xdr | krpc | nfslockd | nfscl | nfsd | zfs
+xdr/xdr_reference.c		optional xdr | krpc | nfslockd | nfscl | nfsd | zfs
+xdr/xdr_sizeof.c		optional xdr | krpc | nfslockd | nfscl | nfsd | zfs

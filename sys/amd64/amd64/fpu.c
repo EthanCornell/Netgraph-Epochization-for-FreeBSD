@@ -538,7 +538,7 @@ fpuformat(void)
  *      (FP_X_INV, FP_X_DZ)
  * 4  Denormal operand (FP_X_DNML)
  * 5  Numeric over/underflow (FP_X_OFL, FP_X_UFL)
- * 6  Inexact result (FP_X_IMP) 
+ * 6  Inexact result (FP_X_IMP)
  */
 static char fpetable[128] = {
 	0,
@@ -1066,10 +1066,6 @@ static device_method_t fpupnp_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		fpupnp_probe),
 	DEVMETHOD(device_attach,	fpupnp_attach),
-	DEVMETHOD(device_detach,	bus_generic_detach),
-	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
-	DEVMETHOD(device_suspend,	bus_generic_suspend),
-	DEVMETHOD(device_resume,	bus_generic_resume),
 	{ 0, 0 }
 };
 

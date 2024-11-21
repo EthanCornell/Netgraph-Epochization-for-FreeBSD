@@ -127,6 +127,8 @@ extern struct pmap	kernel_pmap_store;
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
 
+extern pt_entry_t pmap_sh_attr;
+
 /*
  * Macros to test if a mapping is mappable with an L1 Section mapping
  * or an L2 Large Page mapping.
@@ -170,7 +172,6 @@ int	pmap_fault(pmap_t, uint64_t, uint64_t);
 struct pcb *pmap_switch(struct thread *);
 
 extern void (*pmap_clean_stage2_tlbi)(void);
-extern void (*pmap_invalidate_vpipt_icache)(void);
 extern void (*pmap_stage2_invalidate_range)(uint64_t, vm_offset_t, vm_offset_t,
     bool);
 extern void (*pmap_stage2_invalidate_all)(uint64_t);

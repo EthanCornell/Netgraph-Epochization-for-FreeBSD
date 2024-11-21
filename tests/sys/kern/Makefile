@@ -34,6 +34,7 @@ ATF_TESTS_C+=	socket_accept
 ATF_TESTS_C+=	socket_accf
 ATF_TESTS_C+=	socket_msg_trunc
 ATF_TESTS_C+=	socket_msg_waitall
+ATF_TESTS_C+=	socket_splice
 TEST_METADATA.sigwait+=	is_exclusive="true"
 .if ${MACHINE_ARCH} != "i386" && ${MACHINE_ARCH:Mpowerpc*} == ""
 ATF_TESTS_C+=	subr_physmem_test
@@ -62,7 +63,6 @@ TEST_METADATA.sonewconn_overflow+=	required_user="root"
 TEST_METADATA.sonewconn_overflow+=	is_exclusive="true"
 ATF_TESTS_SH+=	sendfile_test
 ATF_TESTS_SH+=	sysctl_security_jail_children
-TEST_METADATA.sysctl_security_jail_children+=	is_exclusive="true"
 
 ${PACKAGE}FILES+=	sonewconn_overflow.py
 ${PACKAGE}FILESMODE_sonewconn_overflow.py=0555
@@ -84,6 +84,7 @@ LIBADD.ktls_test+=			crypto util
 LIBADD.listener_wakeup+=		pthread
 LIBADD.shutdown_dgram+=			pthread
 LIBADD.socket_msg_waitall+=		pthread
+LIBADD.socket_splice+=			pthread
 LIBADD.sendfile_helper+=		pthread
 LIBADD.fdgrowtable_test+=		util pthread kvm procstat
 LIBADD.sigwait+=			rt
@@ -125,6 +126,7 @@ WARNS?=	3
 TESTS_SUBDIRS+=	acct
 TESTS_SUBDIRS+=	execve
 TESTS_SUBDIRS+=	pipe
+TESTS_SUBDIRS+=	tty
 
 .include <netbsd-tests.test.mk>
 

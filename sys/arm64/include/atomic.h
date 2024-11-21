@@ -65,8 +65,9 @@ extern _Bool lse_supported;
 
 #include <sys/atomic_common.h>
 
-#ifdef _KERNEL
-
+#if defined(__ARM_FEATURE_ATOMICS)
+#define	_ATOMIC_LSE_SUPPORTED	1
+#elif defined(_KERNEL)
 #ifdef LSE_ATOMICS
 #define	_ATOMIC_LSE_SUPPORTED	1
 #else
@@ -608,6 +609,8 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_set_ptr			atomic_set_64
 #define	atomic_swap_ptr			atomic_swap_64
 #define	atomic_subtract_ptr		atomic_subtract_64
+#define	atomic_testandclear_ptr		atomic_testandclear_64
+#define	atomic_testandset_ptr		atomic_testandset_64
 
 #define	atomic_add_acq_long		atomic_add_acq_64
 #define	atomic_fcmpset_acq_long		atomic_fcmpset_acq_64

@@ -21,6 +21,7 @@ LDIRS=	BSD_daemon \
 	libvgl \
 	mdoc \
 	netgraph \
+	oci \
 	perfmon \
 	ppi \
 	ppp \
@@ -199,6 +200,11 @@ SE_NETGRAPH= \
 	virtual.chain \
 	virtual.lan \
 
+SE_DIRS+=	oci
+SE_OCI= \
+	README \
+	Containerfile.pkg
+
 SE_DIRS+=	perfmon
 SE_PERFMON= \
 	Makefile \
@@ -315,15 +321,13 @@ SE_SCSI_TARGET= \
 
 SE_DIRS+=	sound
 SE_SOUND= \
-	  sndstat_nv.c
+	  sndstat_nv.c \
+	  midi.c
 
 SE_DIRS+=	sound/oss
 SE_SOUND_OSS= \
 	README \
-	basic.c \
-	midi.c \
-	ossinit.h \
-	ossmidi.h
+	audio.c
 
 SE_DIRS+=	sunrpc
 SE_SUNRPC=	Makefile

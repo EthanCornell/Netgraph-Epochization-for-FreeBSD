@@ -256,12 +256,6 @@ offload_socket(struct socket *so, struct toepcb *toep)
 	toep->inp = inp;
 	toep->flags |= TPF_ATTACHED;
 	in_pcbref(inp);
-
-	/* Add the TOE PCB to the active list */
-	mtx_lock(&td->toep_list_lock);
-	TAILQ_INSERT_HEAD(&td->toep_list, toep, link);
-	toep->flags |= TPF_IN_TOEP_LIST;
-	mtx_unlock(&td->toep_list_lock);
 }
 
 void
@@ -280,7 +274,6 @@ undo_offload_socket(struct socket *so)
 	struct inpcb *inp = sotoinpcb(so);
 	struct tcpcb *tp = intotcpcb(inp);
 	struct toepcb *toep = tp->t_toe;
-	struct tom_data *td = toep->td;
 	struct sockbuf *sb;
 
 	INP_WLOCK_ASSERT(inp);
@@ -303,11 +296,6 @@ undo_offload_socket(struct socket *so)
 	toep->flags &= ~TPF_ATTACHED;
 	if (in_pcbrele_wlocked(inp))
 		panic("%s: inp freed.", __func__);
-
-	mtx_lock(&td->toep_list_lock);
-	toep->flags &= ~TPF_IN_TOEP_LIST;
-	TAILQ_REMOVE(&td->toep_list, toep, link);
-	mtx_unlock(&td->toep_list_lock);
 }
 
 static void
@@ -331,6 +319,12 @@ release_offload_resources(struct toepcb *toep)
 		remove_tid(sc, tid, toep->ce ? 2 : 1);
 		release_tid(sc, tid, toep->ctrlq);
 		toep->tid = -1;
+		mtx_lock(&td->toep_list_lock);
+		if (toep->flags & TPF_IN_TOEP_LIST) {
+			toep->flags &= ~TPF_IN_TOEP_LIST;
+			TAILQ_REMOVE(&td->toep_list, toep, link);
+		}
+		mtx_unlock(&td->toep_list_lock);
 	}
 	if (toep->ce) {
 		t4_release_clip_entry(sc, toep->ce);
@@ -346,8 +340,6 @@ release_offload_resources(struct toepcb *toep)
 static void
 done_with_toepcb(struct toepcb *toep)
 {
-	struct tom_data *td = toep->td;
-
 	KASSERT(!(toep->flags & TPF_CPL_PENDING),
 	    ("%s: %p has CPL pending.", __func__, toep));
 	KASSERT(!(toep->flags & TPF_ATTACHED),
@@ -370,13 +362,7 @@ done_with_toepcb(struct toepcb *toep)
 	MPASS(toep->tid == -1);
 	MPASS(toep->l2te == NULL);
 	MPASS(toep->ce == NULL);
-
-	mtx_lock(&td->toep_list_lock);
-	if (toep->flags & TPF_IN_TOEP_LIST) {
-		toep->flags &= ~TPF_IN_TOEP_LIST;
-		TAILQ_REMOVE(&td->toep_list, toep, link);
-	}
-	mtx_unlock(&td->toep_list_lock);
+	MPASS((toep->flags & TPF_IN_TOEP_LIST) == 0);
 
 	free_toepcb(toep);
 }
@@ -1960,26 +1946,34 @@ done:
 static int
 t4_tom_deactivate(struct adapter *sc)
 {
-	int rc = 0;
+	int rc = 0, i, v;
 	struct tom_data *td = sc->tom_softc;
+	struct vi_info *vi;
 
 	ASSERT_SYNCHRONIZED_OP(sc);
 
 	if (td == NULL)
 		return (0);	/* XXX. KASSERT? */
 
-	if (sc->offload_map != 0)
-		return (EBUSY);	/* at least one port has IFCAP_TOE enabled */
-
 	if (uld_active(sc, ULD_IWARP) || uld_active(sc, ULD_ISCSI))
 		return (EBUSY);	/* both iWARP and iSCSI rely on the TOE. */
+
+	if (sc->offload_map != 0) {
+		for_each_port(sc, i) {
+			for_each_vi(sc->port[i], v, vi) {
+				toe_capability(vi, false);
+				if_setcapenablebit(vi->ifp, 0, IFCAP_TOE);
+				SETTOEDEV(vi->ifp, NULL);
+			}
+		}
+		MPASS(sc->offload_map == 0);
+	}
 
 	mtx_lock(&td->toep_list_lock);
 	if (!TAILQ_EMPTY(&td->toep_list))
 		rc = EBUSY;
 	MPASS(TAILQ_EMPTY(&td->synqe_list));
 	MPASS(TAILQ_EMPTY(&td->stranded_tids));
-	mtx_unlock(&td->toep_list_lock);
 	mtx_unlock(&td->toep_list_lock);
 
 	mtx_lock(&td->lctx_hash_lock);
@@ -2039,6 +2033,8 @@ stop_atids(struct adapter *sc)
 		if ((uintptr_t)toep >= (uintptr_t)&t->atid_tab[0] &&
 		    (uintptr_t)toep < (uintptr_t)&t->atid_tab[t->natids])
 			continue;
+		if (__predict_false(toep == NULL))
+			continue;
 		MPASS(toep->tid == atid);
 		MPASS(toep->incarnation == sc->incarnation);
 		/*
@@ -2052,6 +2048,8 @@ stop_atids(struct adapter *sc)
 		toep->tid = -1;
 #endif
 		mtx_lock(&td->toep_list_lock);
+		toep->flags &= ~TPF_IN_TOEP_LIST;
+		TAILQ_REMOVE(&td->toep_list, toep, link);
 		TAILQ_INSERT_TAIL(&td->stranded_atids, toep, link);
 		mtx_unlock(&td->toep_list_lock);
 	}
@@ -2109,16 +2107,32 @@ static void
 stop_tom_l2t(struct adapter *sc)
 {
 	struct l2t_data *d = sc->l2t;
+	struct tom_data *td = sc->tom_softc;
 	struct l2t_entry *e;
+	struct wrqe *wr;
 	int i;
+
+	/*
+	 * This task cannot be enqueued because L2 state changes are not being
+	 * processed.  But if it's already scheduled or running then we need to
+	 * wait for it to cleanup the atids in the unsent_wr_list.
+	 */
+	taskqueue_drain(taskqueue_thread, &td->reclaim_wr_resources);
+	MPASS(STAILQ_EMPTY(&td->unsent_wr_list));
 
 	for (i = 0; i < d->l2t_size; i++) {
 		e = &d->l2tab[i];
 		mtx_lock(&e->lock);
-		if (e->state == L2T_STATE_VALID)
+		if (e->state == L2T_STATE_VALID || e->state == L2T_STATE_STALE)
 			e->state = L2T_STATE_RESOLVING;
-		if (!STAILQ_EMPTY(&e->wr_list))
-			CXGBE_UNIMPLEMENTED("l2t e->wr_list");
+		/*
+		 * stop_atids is going to clean up _all_ atids in use, including
+		 * these that were pending L2 resolution.  Just discard the WRs.
+		 */
+		while ((wr = STAILQ_FIRST(&e->wr_list)) != NULL) {
+			STAILQ_REMOVE_HEAD(&e->wr_list, link);
+			free(wr, M_CXGBE);
+		}
 		mtx_unlock(&e->lock);
 	}
 }
@@ -2139,6 +2153,12 @@ t4_tom_stop(struct adapter *sc)
 	if (atomic_load_int(&t->tids_in_use) > 0)
 		stop_tids(sc);
 	taskqueue_enqueue(taskqueue_thread, &td->cleanup_stranded_tids);
+
+	/*
+	 * L2T and atid_tab are restarted before t4_tom_restart so this assert
+	 * is not valid in t4_tom_restart.  This is the next best place for it.
+	 */
+	MPASS(STAILQ_EMPTY(&td->unsent_wr_list));
 
 	return (0);
 }
@@ -2232,14 +2252,16 @@ t4_tom_mod_load(void)
 }
 
 static void
-tom_uninit(struct adapter *sc, void *arg __unused)
+tom_uninit(struct adapter *sc, void *arg)
 {
+	bool *ok_to_unload = arg;
+
 	if (begin_synchronized_op(sc, NULL, SLEEP_OK | INTR_OK, "t4tomun"))
 		return;
 
 	/* Try to free resources (works only if no port has IFCAP_TOE) */
-	if (uld_active(sc, ULD_TOM))
-		t4_deactivate_uld(sc, ULD_TOM);
+	if (uld_active(sc, ULD_TOM) && t4_deactivate_uld(sc, ULD_TOM) != 0)
+		*ok_to_unload = false;
 
 	end_synchronized_op(sc, 0);
 }
@@ -2247,7 +2269,11 @@ tom_uninit(struct adapter *sc, void *arg __unused)
 static int
 t4_tom_mod_unload(void)
 {
-	t4_iterate(tom_uninit, NULL);
+	bool ok_to_unload = true;
+
+	t4_iterate(tom_uninit, &ok_to_unload);
+	if (!ok_to_unload)
+		return (EBUSY);
 
 	if (t4_unregister_uld(&tom_uld_info, ULD_TOM) == EBUSY)
 		return (EBUSY);

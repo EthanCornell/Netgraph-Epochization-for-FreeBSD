@@ -854,7 +854,7 @@ tcp_packets_this_ack(struct tcpcb *tp, tcp_seq ack)
 #define	TF2_CANNOT_DO_ECN	0x00080000 /* The stack does not do ECN */
 #define	TF2_PROC_SACK_PROHIBIT	0x00100000 /* Due to small MSS size do not process sack's */
 #define	TF2_IPSEC_TSO		0x00200000 /* IPSEC + TSO supported */
-#define	TF2_NO_ISS_CHECK	0x00200000 /* Don't check SEG.ACK against ISS */
+#define	TF2_NO_ISS_CHECK	0x00400000 /* Don't check SEG.ACK against ISS */
 
 /*
  * Structure to hold TCP options that are only used during segment
@@ -892,13 +892,13 @@ struct tcpopt {
 #define	TO_SYN		0x01		/* parse SYN-only options */
 
 struct hc_metrics_lite {	/* must stay in sync with hc_metrics */
-	uint32_t	rmx_mtu;	/* MTU for this path */
-	uint32_t	rmx_ssthresh;	/* outbound gateway buffer limit */
-	uint32_t	rmx_rtt;	/* estimated round trip time */
-	uint32_t	rmx_rttvar;	/* estimated rtt variance */
-	uint32_t	rmx_cwnd;	/* congestion window */
-	uint32_t	rmx_sendpipe;   /* outbound delay-bandwidth product */
-	uint32_t	rmx_recvpipe;   /* inbound delay-bandwidth product */
+	uint32_t	hc_mtu;		/* MTU for this path */
+	uint32_t	hc_ssthresh;	/* outbound gateway buffer limit */
+	uint32_t	hc_rtt;		/* estimated round trip time */
+	uint32_t	hc_rttvar;	/* estimated rtt variance */
+	uint32_t	hc_cwnd;	/* congestion window */
+	uint32_t	hc_sendpipe;	/* outbound delay-bandwidth product */
+	uint32_t	hc_recvpipe;	/* inbound delay-bandwidth product */
 };
 
 #ifndef _NETINET_IN_PCB_H_
@@ -1107,8 +1107,6 @@ struct	tcpstat {
 #define	tcps_rcvmemdrop	tcps_rcvreassfull	/* compat */
 
 #ifdef _KERNEL
-#define	TI_UNLOCKED	1
-#define	TI_RLOCKED	2
 #include <sys/counter.h>
 #include <netinet/in_kdtrace.h>
 
@@ -1488,10 +1486,10 @@ void	 tcp_hc_init(void);
 #ifdef VIMAGE
 void	 tcp_hc_destroy(void);
 #endif
-void	 tcp_hc_get(struct in_conninfo *, struct hc_metrics_lite *);
-uint32_t tcp_hc_getmtu(struct in_conninfo *);
-void	 tcp_hc_updatemtu(struct in_conninfo *, uint32_t);
-void	 tcp_hc_update(struct in_conninfo *, struct hc_metrics_lite *);
+void	 tcp_hc_get(const struct in_conninfo *, struct hc_metrics_lite *);
+uint32_t tcp_hc_getmtu(const struct in_conninfo *);
+void	 tcp_hc_updatemtu(const struct in_conninfo *, uint32_t);
+void	 tcp_hc_update(const struct in_conninfo *, struct hc_metrics_lite *);
 void 	 cc_after_idle(struct tcpcb *tp);
 
 extern	struct protosw tcp_protosw;		/* shared for TOE */
@@ -1508,7 +1506,7 @@ void	 tcp_update_sack_list(struct tcpcb *tp, tcp_seq rcv_laststart,
 	    tcp_seq rcv_lastend);
 void	 tcp_clean_dsack_blocks(struct tcpcb *tp);
 void	 tcp_clean_sackreport(struct tcpcb *tp);
-void	 tcp_sack_adjust(struct tcpcb *tp);
+int	 tcp_sack_adjust(struct tcpcb *tp);
 struct sackhole *tcp_sack_output(struct tcpcb *tp, int *sack_bytes_rexmt);
 void	 tcp_do_prr_ack(struct tcpcb *, struct tcphdr *, struct tcpopt *,
 	    sackstatus_t, u_int *);

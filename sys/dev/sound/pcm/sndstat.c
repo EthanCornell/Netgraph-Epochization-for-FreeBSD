@@ -150,10 +150,7 @@ sndstat_open(struct cdev *i_dev, int flags, int mode, struct thread *td)
 
 	pf = malloc(sizeof(*pf), M_DEVBUF, M_WAITOK | M_ZERO);
 
-	if (sbuf_new(&pf->sbuf, NULL, 4096, SBUF_AUTOEXTEND) == NULL) {
-		free(pf, M_DEVBUF);
-		return (ENOMEM);
-	}
+	sbuf_new(&pf->sbuf, NULL, 4096, SBUF_AUTOEXTEND);
 
 	pf->fflags = flags;
 	TAILQ_INIT(&pf->userdev_list);
@@ -388,6 +385,7 @@ sndstat_build_sound4_nvlist(struct snddev_info *d, nvlist_t **dip)
 	uint32_t maxrate, minrate, fmts, minchn, maxchn, caps;
 	nvlist_t *di = NULL, *sound4di = NULL, *diinfo = NULL, *cdi = NULL;
 	int err, nchan;
+	char buf[AFMTSTR_LEN];
 
 	di = nvlist_create(0);
 	if (di == NULL) {
@@ -517,8 +515,13 @@ sndstat_build_sound4_nvlist(struct snddev_info *d, nvlist_t **dip)
 		nvlist_add_number(cdi, SNDST_DSPS_SOUND4_CHAN_SWBUF_READY,
 		    sndbuf_getready(c->bufsoft));
 
-		sbuf_printf(&sb, "[%s",
-		    (c->direction == PCMDIR_REC) ? "hardware" : "userland");
+		if (c->parentchannel != NULL) {
+			sbuf_printf(&sb, "[%s", (c->direction == PCMDIR_REC) ?
+			    c->parentchannel->name : "userland");
+		} else {
+			sbuf_printf(&sb, "[%s", (c->direction == PCMDIR_REC) ?
+			    "hardware" : "userland");
+		}
 		sbuf_printf(&sb, " -> ");
 		f = c->feeder;
 		while (f->source != NULL)
@@ -526,10 +529,12 @@ sndstat_build_sound4_nvlist(struct snddev_info *d, nvlist_t **dip)
 		while (f != NULL) {
 			sbuf_printf(&sb, "%s", f->class->name);
 			if (f->desc->type == FEEDER_FORMAT) {
-				sbuf_printf(&sb, "(0x%08x -> 0x%08x)",
-				    f->desc->in, f->desc->out);
+				snd_afmt2str(f->desc->in, buf, sizeof(buf));
+				sbuf_printf(&sb, "(%s -> ", buf);
+				snd_afmt2str(f->desc->out, buf, sizeof(buf));
+				sbuf_printf(&sb, "%s)", buf);
 			} else if (f->desc->type == FEEDER_MATRIX) {
-				sbuf_printf(&sb, "(%d.%d -> %d.%d)",
+				sbuf_printf(&sb, "(%d.%dch -> %d.%dch)",
 				    AFMT_CHANNEL(f->desc->in) -
 				    AFMT_EXTCHANNEL(f->desc->in),
 				    AFMT_EXTCHANNEL(f->desc->in),
@@ -537,21 +542,23 @@ sndstat_build_sound4_nvlist(struct snddev_info *d, nvlist_t **dip)
 				    AFMT_EXTCHANNEL(f->desc->out),
 				    AFMT_EXTCHANNEL(f->desc->out));
 			} else if (f->desc->type == FEEDER_RATE) {
-				sbuf_printf(&sb,
-				    "(0x%08x q:%d %d -> %d)",
-				    f->desc->out,
-				    FEEDER_GET(f, FEEDRATE_QUALITY),
+				sbuf_printf(&sb, "(%d -> %d)",
 				    FEEDER_GET(f, FEEDRATE_SRC),
 				    FEEDER_GET(f, FEEDRATE_DST));
 			} else {
-				sbuf_printf(&sb, "(0x%08x)",
-				    f->desc->out);
+				snd_afmt2str(f->desc->out, buf, sizeof(buf));
+				sbuf_printf(&sb, "(%s)", buf);
 			}
 			sbuf_printf(&sb, " -> ");
 			f = f->parent;
 		}
-		sbuf_printf(&sb, "%s]",
-		    (c->direction == PCMDIR_REC) ? "userland" : "hardware");
+		if (c->parentchannel != NULL) {
+			sbuf_printf(&sb, "%s]", (c->direction == PCMDIR_REC) ?
+			    "userland" : c->parentchannel->name);
+		} else {
+			sbuf_printf(&sb, "%s]", (c->direction == PCMDIR_REC) ?
+			    "userland" : "hardware");
+		}
 
 		CHN_UNLOCK(c);
 
@@ -1099,7 +1106,7 @@ sndstat_line2userdev(struct sndstat_file *pf, const char *line, int n)
 	if (e == NULL)
 		goto fail;
 	ud->nameunit = strndup(line, e - line, M_DEVBUF);
-	ud->devnode = (char *)malloc(e - line + 1, M_DEVBUF, M_WAITOK | M_ZERO);
+	ud->devnode = malloc(e - line + 1, M_DEVBUF, M_WAITOK | M_ZERO);
 	strlcat(ud->devnode, ud->nameunit, e - line + 1);
 	line = e + 1;
 
@@ -1273,12 +1280,12 @@ sndstat_prepare_pcm(struct sbuf *s, device_t dev, int verbose)
 		}
 		sbuf_printf(s, "\n\t");
 
-		sbuf_printf(s, "interrupts %d, ", c->interrupts);
+		sbuf_printf(s, "\tinterrupts %d, ", c->interrupts);
 
 		if (c->direction == PCMDIR_REC)	{
 			sbuf_printf(s,
 			    "overruns %d, feed %u, hfree %d, "
-			    "sfree %d [b:%d/%d/%d|bs:%d/%d/%d]",
+			    "sfree %d\n\t\t[b:%d/%d/%d|bs:%d/%d/%d]",
 				c->xruns, c->feedcount,
 				sndbuf_getfree(c->bufhard),
 				sndbuf_getfree(c->bufsoft),
@@ -1291,7 +1298,7 @@ sndstat_prepare_pcm(struct sbuf *s, device_t dev, int verbose)
 		} else {
 			sbuf_printf(s,
 			    "underruns %d, feed %u, ready %d "
-			    "[b:%d/%d/%d|bs:%d/%d/%d]",
+			    "\n\t\t[b:%d/%d/%d|bs:%d/%d/%d]",
 				c->xruns, c->feedcount,
 				sndbuf_getready(c->bufsoft),
 				sndbuf_getsize(c->bufhard),
@@ -1303,11 +1310,16 @@ sndstat_prepare_pcm(struct sbuf *s, device_t dev, int verbose)
 		}
 		sbuf_printf(s, "\n\t");
 
-		sbuf_printf(s, "channel flags=0x%b", c->flags, CHN_F_BITS);
+		sbuf_printf(s, "\tchannel flags=0x%b", c->flags, CHN_F_BITS);
 		sbuf_printf(s, "\n\t");
 
-		sbuf_printf(s, "{%s}",
-		    (c->direction == PCMDIR_REC) ? "hardware" : "userland");
+		if (c->parentchannel != NULL) {
+			sbuf_printf(s, "\t{%s}", (c->direction == PCMDIR_REC) ?
+			    c->parentchannel->name : "userland");
+		} else {
+			sbuf_printf(s, "\t{%s}", (c->direction == PCMDIR_REC) ?
+			    "hardware" : "userland");
+		}
 		sbuf_printf(s, " -> ");
 		f = c->feeder;
 		while (f->source != NULL)
@@ -1339,8 +1351,13 @@ sndstat_prepare_pcm(struct sbuf *s, device_t dev, int verbose)
 			sbuf_printf(s, " -> ");
 			f = f->parent;
 		}
-		sbuf_printf(s, "{%s}",
-		    (c->direction == PCMDIR_REC) ? "userland" : "hardware");
+		if (c->parentchannel != NULL) {
+			sbuf_printf(s, "{%s}", (c->direction == PCMDIR_REC) ?
+			    "userland" : c->parentchannel->name);
+		} else {
+			sbuf_printf(s, "{%s}", (c->direction == PCMDIR_REC) ?
+			    "userland" : "hardware");
+		}
 
 		CHN_UNLOCK(c);
 	}

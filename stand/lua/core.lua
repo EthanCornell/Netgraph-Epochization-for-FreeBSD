@@ -369,7 +369,8 @@ end
 function core.loadEntropy()
 	if core.isUEFIBoot() then
 		if (loader.getenv("entropy_efi_seed") or "no"):lower() == "yes" then
-			loader.perform("efi-seed-entropy")
+			local seedsize = loader.getenv("entropy_efi_seed_size") or "2048"
+			loader.perform("efi-seed-entropy " .. seedsize)
 		end
 	end
 end
@@ -540,6 +541,15 @@ function core.nextConsoleChoice()
 			loader.setenv("boot_serial", "YES")
 		end
 	end
+end
+
+-- The graphical-enabled loaders have unicode drawing character support. The
+-- text-only ones do not. We check the old and new bindings for term_drawrect as
+-- a proxy for unicode support, which will work on older boot loaders as well
+-- as be future proof for when we remove the old binding. This also abstracts
+-- out the test to one spot in case we start to export this notion more directly.
+function core.hasUnicode()
+	 return gfx.term_drawrect ~= nil or loader.term_drawrect ~= nil
 end
 
 -- Sanity check the boot loader revision
