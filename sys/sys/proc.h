@@ -494,6 +494,7 @@ enum {
 	TDA_RACCT,
 	TDA_MOD1,		/* For third party use, before signals are */
 	TAD_MOD2,		/* processed .. */
+	TDA_PSELECT,		/* For discarding temporary signal mask */
 	TDA_SIG,
 	TDA_KTRACE,
 	TDA_SUSPEND,
@@ -567,6 +568,7 @@ enum {
 #define	TDP2_SBPAGES	0x00000001 /* Owns sbusy on some pages */
 #define	TDP2_COMPAT32RB	0x00000002 /* compat32 ABI for robust lists */
 #define	TDP2_ACCT	0x00000004 /* Doing accounting */
+#define	TDP2_SAN_QUIET	0x00000008 /* Disable warnings from K(A|M)SAN */
 
 /*
  * Reasons that the current thread can not be run yet.
