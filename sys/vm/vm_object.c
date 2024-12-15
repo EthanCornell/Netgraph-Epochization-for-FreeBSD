@@ -1599,13 +1599,14 @@ retry:
 		 * an incomplete fault.  Just remove and ignore.
 		 */
 		if (vm_page_none_valid(m)) {
-			if (vm_page_iter_remove(&pages))
+			if (vm_page_iter_remove(&pages, m))
 				vm_page_free(m);
 			continue;
 		}
 
-		/* vm_page_rename() will dirty the page. */
-		if (vm_page_rename(&pages, new_object, m->pindex - offidxstart)) {
+		/* vm_page_iter_rename() will dirty the page. */
+		if (!vm_page_iter_rename(&pages, m, new_object, m->pindex -
+		    offidxstart)) {
 			vm_page_xunbusy(m);
 			VM_OBJECT_WUNLOCK(new_object);
 			VM_OBJECT_WUNLOCK(orig_object);
@@ -1726,7 +1727,7 @@ vm_object_collapse_scan(vm_object_t object)
 
 			KASSERT(!pmap_page_is_mapped(p),
 			    ("freeing mapped page %p", p));
-			if (vm_page_iter_remove(&pages))
+			if (vm_page_iter_remove(&pages, p))
 				vm_page_free(p);
 			next = vm_radix_iter_step(&pages);
 			continue;
@@ -1735,7 +1736,7 @@ vm_object_collapse_scan(vm_object_t object)
 		if (!vm_page_all_valid(p)) {
 			KASSERT(!pmap_page_is_mapped(p),
 			    ("freeing mapped page %p", p));
-			if (vm_page_iter_remove(&pages))
+			if (vm_page_iter_remove(&pages, p))
 				vm_page_free(p);
 			next = vm_radix_iter_step(&pages);
 			continue;
@@ -1778,7 +1779,7 @@ vm_object_collapse_scan(vm_object_t object)
 			    ("freeing mapped page %p", p));
 			if (pp != NULL)
 				vm_page_xunbusy(pp);
-			if (vm_page_iter_remove(&pages))
+			if (vm_page_iter_remove(&pages, p))
 				vm_page_free(p);
 			next = vm_radix_iter_step(&pages);
 			continue;
@@ -1789,9 +1790,10 @@ vm_object_collapse_scan(vm_object_t object)
 		 * backing object to the main object.
 		 *
 		 * If the page was mapped to a process, it can remain mapped
-		 * through the rename.  vm_page_rename() will dirty the page.
+		 * through the rename.  vm_page_iter_rename() will dirty the
+		 * page.
 		 */
-		if (vm_page_rename(&pages, object, new_pindex)) {
+		if (!vm_page_iter_rename(&pages, p, object, new_pindex)) {
 			vm_page_xunbusy(p);
 			next = vm_object_collapse_scan_wait(&pages, object,
 			    NULL);

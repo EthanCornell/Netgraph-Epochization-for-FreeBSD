@@ -80,12 +80,6 @@ static int amdiommu_enable = 0;
 static TAILQ_HEAD(, amdiommu_unit) amdiommu_units =
     TAILQ_HEAD_INITIALIZER(amdiommu_units);
 
-static u_int
-ivrs_info_to_unit_id(UINT32 info)
-{
-	return ((info & ACPI_IVHD_UNIT_ID_MASK) >> 8);
-}
-
 typedef bool (*amdiommu_itercc_t)(void *, void *);
 typedef bool (*amdiommu_iter40_t)(ACPI_IVRS_HARDWARE2 *, void *);
 typedef bool (*amdiommu_iter11_t)(ACPI_IVRS_HARDWARE2 *, void *);
@@ -176,7 +170,6 @@ ivrs_lookup_ivhd_0x40(ACPI_IVRS_HARDWARE2 *h2, void *arg)
 		return (false);
 
 	ildp->sc->unit_dom = h2->PciSegmentGroup;
-	ildp->sc->iommu.unit = ivrs_info_to_unit_id(h2->Info);
 	ildp->sc->efr = h2->EfrRegisterImage;
 	return (true);
 }
@@ -194,7 +187,6 @@ ivrs_lookup_ivhd_0x10(ACPI_IVRS_HARDWARE1 *h1, void *arg)
 		return (false);
 
 	ildp->sc->unit_dom = h1->PciSegmentGroup;
-	ildp->sc->iommu.unit = ivrs_info_to_unit_id(h1->Info);
 	return (true);
 }
 
@@ -456,6 +448,7 @@ amdiommu_attach(device_t dev)
 	bool res;
 
 	sc = device_get_softc(dev);
+	sc->iommu.unit = device_get_unit(dev);
 	sc->iommu.dev = dev;
 
 	error = pci_find_cap(dev, PCIY_SECDEV, &sc->seccap_reg);
