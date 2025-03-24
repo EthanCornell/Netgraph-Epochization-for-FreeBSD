@@ -198,7 +198,6 @@ SUBDIR=	\
 	${_iwlwifi} \
 	${_iwlwififw} \
 	${_iwm} \
-	${_iwmfw} \
 	${_iwn} \
 	${_iwnfw} \
 	${_ix} \
@@ -421,6 +420,7 @@ SUBDIR=	\
 	wlan_acl \
 	wlan_amrr \
 	wlan_ccmp \
+	wlan_gcmp \
 	wlan_rssadapt \
 	wlan_tkip \
 	wlan_wep \
@@ -805,7 +805,6 @@ _iwn=		iwn
 .if ${MK_SOURCELESS_UCODE} != "no"
 _ipwfw=		ipwfw
 _iwifw=		iwifw
-_iwmfw=		iwmfw
 _iwnfw=		iwnfw
 .endif
 _nfe=		nfe

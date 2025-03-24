@@ -2632,13 +2632,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* gssd_syscall */
-	case 505: {
-		struct gssd_syscall_args *p = params;
-		uarg[a++] = (intptr_t)p->path; /* const char * */
-		*n_args = 1;
-		break;
-	}
 	/* freebsd32_jail_get */
 	case 506: {
 		struct freebsd32_jail_get_args *p = params;
@@ -3264,9 +3257,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* rpctls_syscall */
 	case 576: {
 		struct rpctls_syscall_args *p = params;
-		iarg[a++] = p->op; /* int */
-		uarg[a++] = (intptr_t)p->path; /* const char * */
-		*n_args = 2;
+		uarg[a++] = p->socookie; /* uint64_t */
+		*n_args = 1;
 		break;
 	}
 	/* __specialfd */
@@ -3383,6 +3375,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct fchroot_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		*n_args = 1;
+		break;
+	}
+	/* freebsd32_setcred */
+	case 591: {
+		struct freebsd32_setcred_args *p = params;
+		uarg[a++] = p->flags; /* u_int */
+		uarg[a++] = (intptr_t)p->wcred; /* const struct setcred32 * */
+		uarg[a++] = p->size; /* size_t */
+		*n_args = 3;
 		break;
 	}
 	default:
@@ -7772,16 +7773,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* gssd_syscall */
-	case 505:
-		switch (ndx) {
-		case 0:
-			p = "userland const char *";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* freebsd32_jail_get */
 	case 506:
 		switch (ndx) {
@@ -8941,10 +8932,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 576:
 		switch (ndx) {
 		case 0:
-			p = "int";
-			break;
-		case 1:
-			p = "userland const char *";
+			p = "uint64_t";
 			break;
 		default:
 			break;
@@ -9138,6 +9126,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		switch (ndx) {
 		case 0:
 			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd32_setcred */
+	case 591:
+		switch (ndx) {
+		case 0:
+			p = "u_int";
+			break;
+		case 1:
+			p = "userland const struct setcred32 *";
+			break;
+		case 2:
+			p = "size_t";
 			break;
 		default:
 			break;
@@ -10637,11 +10641,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* gssd_syscall */
-	case 505:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* freebsd32_jail_get */
 	case 506:
 		if (ndx == 0 || ndx == 1)
@@ -11033,6 +11032,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* fchroot */
 	case 590:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd32_setcred */
+	case 591:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

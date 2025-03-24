@@ -167,7 +167,6 @@ efi_init(void)
 	struct efi_map_header *efihdr;
 	struct efi_md *map;
 	struct efi_rt *rtdm;
-	caddr_t kmdp;
 	size_t efisz;
 	int ndesc, rt_disabled;
 
@@ -197,10 +196,7 @@ efi_init(void)
 			printf("EFI config table is not present\n");
 	}
 
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
-		kmdp = preload_search_by_type("elf64 kernel");
-	efihdr = (struct efi_map_header *)preload_search_info(kmdp,
+	efihdr = (struct efi_map_header *)preload_search_info(preload_kmdp,
 	    MODINFO_METADATA | MODINFOMD_EFI_MAP);
 	if (efihdr == NULL) {
 		if (bootverbose)
@@ -490,31 +486,32 @@ efi_rt_arch_call_nofault(struct efirt_callinfo *ec)
 
 	switch (ec->ec_argcnt) {
 	case 0:
-		ec->ec_efi_status = ((register_t (*)(void))ec->ec_fptr)();
+		ec->ec_efi_status = ((register_t EFIABI_ATTR (*)(void))
+		    ec->ec_fptr)();
 		break;
 	case 1:
-		ec->ec_efi_status = ((register_t (*)(register_t))ec->ec_fptr)
-		    (ec->ec_arg1);
+		ec->ec_efi_status = ((register_t EFIABI_ATTR (*)(register_t))
+		    ec->ec_fptr)(ec->ec_arg1);
 		break;
 	case 2:
-		ec->ec_efi_status = ((register_t (*)(register_t, register_t))
-		    ec->ec_fptr)(ec->ec_arg1, ec->ec_arg2);
+		ec->ec_efi_status = ((register_t EFIABI_ATTR (*)(register_t,
+		    register_t))ec->ec_fptr)(ec->ec_arg1, ec->ec_arg2);
 		break;
 	case 3:
-		ec->ec_efi_status = ((register_t (*)(register_t, register_t,
-		    register_t))ec->ec_fptr)(ec->ec_arg1, ec->ec_arg2,
-		    ec->ec_arg3);
+		ec->ec_efi_status = ((register_t EFIABI_ATTR (*)(register_t,
+		    register_t, register_t))ec->ec_fptr)(ec->ec_arg1,
+		    ec->ec_arg2, ec->ec_arg3);
 		break;
 	case 4:
-		ec->ec_efi_status = ((register_t (*)(register_t, register_t,
-		    register_t, register_t))ec->ec_fptr)(ec->ec_arg1,
-		    ec->ec_arg2, ec->ec_arg3, ec->ec_arg4);
+		ec->ec_efi_status = ((register_t EFIABI_ATTR (*)(register_t,
+		    register_t, register_t, register_t))ec->ec_fptr)(
+		    ec->ec_arg1, ec->ec_arg2, ec->ec_arg3, ec->ec_arg4);
 		break;
 	case 5:
-		ec->ec_efi_status = ((register_t (*)(register_t, register_t,
-		    register_t, register_t, register_t))ec->ec_fptr)(
-		    ec->ec_arg1, ec->ec_arg2, ec->ec_arg3, ec->ec_arg4,
-		    ec->ec_arg5);
+		ec->ec_efi_status = ((register_t EFIABI_ATTR (*)(register_t,
+		    register_t, register_t, register_t, register_t))
+		    ec->ec_fptr)(ec->ec_arg1, ec->ec_arg2, ec->ec_arg3,
+		    ec->ec_arg4, ec->ec_arg5);
 		break;
 	default:
 		panic("efi_rt_arch_call: %d args", (int)ec->ec_argcnt);

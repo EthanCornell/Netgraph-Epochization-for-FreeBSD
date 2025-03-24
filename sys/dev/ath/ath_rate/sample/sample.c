@@ -397,7 +397,8 @@ pick_best_rate(struct ath_node *an, const HAL_RATE_TABLE *rt,
 		 * be abstracted out and properly handled.
 		 */
 		if (an->an_node.ni_flags & IEEE80211_NODE_HT) {
-			if (best_rate_tt == 0 || ((tt * 10) <= (best_rate_tt * 10))) {
+			if (best_rate_tt == 0 ||
+			    ((tt * 9) <= (best_rate_tt * 10))) {
 				best_rate_tt = tt;
 				best_rate_rix = rix;
 				best_rate_pct = pct;
@@ -854,9 +855,14 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 			/* 
 			 * Set the visible txrate for this node.
 			 */
-			an->an_node.ni_txrate =
-			    (rt->info[best_rix].phy == IEEE80211_T_HT) ?
-			     MCS(best_rix) : DOT11RATE(best_rix);
+			if (rt->info[best_rix].phy == IEEE80211_T_HT)
+				ieee80211_node_set_txrate_ht_mcsrate(
+				    &an->an_node,
+				    MCS(best_rix) & IEEE80211_RATE_VAL);
+			else
+				ieee80211_node_set_txrate_dot11rate(
+				    &an->an_node,
+				    DOT11RATE(best_rix));
 		}
 		rix = sn->current_rix[size_bin];
 		sn->packets_since_switch[size_bin]++;
@@ -1408,9 +1414,10 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 #endif
 	/* set the visible bit-rate */
 	if (sn->static_rix != -1)
-		ni->ni_txrate = DOT11RATE(sn->static_rix);
+		ieee80211_node_set_txrate_dot11rate(ni,
+		    DOT11RATE(sn->static_rix));
 	else
-		ni->ni_txrate = RATE(0);
+		ieee80211_node_set_txrate_dot11rate(ni, RATE(0));
 #undef RATE
 #undef DOT11RATE
 }

@@ -90,6 +90,9 @@ device		syscon
 device		syscon_power
 device		riscv_syscon
 
+# CPU frequency control
+device		cpufreq
+
 # Bus drivers
 device		pci
 
@@ -137,6 +140,7 @@ device		uart_ns8250	# ns8250-type UART driver
 
 # Console
 device		vt
+device		vt_efifb
 device		kbdmux
 
 # RTC
@@ -201,5 +205,6 @@ device		iicoc		# OpenCores I2C controller support
 
 # Include SoC specific configuration
 include		"std.allwinner"
+include		"std.eswin"
 include		"std.sifive"
 include		"std.starfive"
