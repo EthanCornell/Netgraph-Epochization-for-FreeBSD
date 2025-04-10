@@ -598,6 +598,25 @@ extern struct sx pf_end_lock;
 #endif /* PF_INET6_ONLY */
 #endif /* PF_INET_INET6 */
 
+#ifdef _KERNEL
+#ifdef INET6
+static void inline
+pf_addrcpy(struct pf_addr *dst, const struct pf_addr *src, sa_family_t af)
+{
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		memcpy(&dst->v4, &src->v4, sizeof(dst->v4));
+		break;
+#endif /* INET */
+	case AF_INET6:
+		memcpy(&dst->v6, &src->v6, sizeof(dst->v6));
+		break;
+	}
+}
+#endif /* INET6 */
+#endif
+
 /*
  * XXX callers not FIB-aware in our version of pf yet.
  * OpenBSD fixed it later it seems, 2010/05/07 13:33:16 claudio.
@@ -677,6 +696,7 @@ struct pf_rule_actions {
 	uint8_t		 min_ttl;
 	uint8_t		 set_prio[2];
 	uint8_t		 rt;
+	uint8_t		 allow_opts;
 };
 
 union pf_keth_rule_ptr {
@@ -1633,6 +1653,8 @@ struct pf_pdesc {
 
 	struct pf_addr	*src;		/* src address */
 	struct pf_addr	*dst;		/* dst address */
+	struct pf_addr	 osrc;
+	struct pf_addr	 odst;
 	u_int16_t	*pcksum;	/* proto cksum */
 	u_int16_t	*sport;
 	u_int16_t	*dport;
@@ -2226,7 +2248,8 @@ VNET_DECLARE(struct pf_udpendpointhash *, pf_udpendpointhash);
 VNET_DECLARE(struct pf_srchash *, pf_srchash);
 #define	V_pf_srchash	VNET(pf_srchash)
 
-#define PF_IDHASH(s)	(be64toh((s)->id) % (V_pf_hashmask + 1))
+#define	PF_IDHASHID(id)	(be64toh(id) % (V_pf_hashmask + 1))
+#define	PF_IDHASH(s)	PF_IDHASHID((s)->id)
 
 VNET_DECLARE(void *, pf_swi_cookie);
 #define V_pf_swi_cookie	VNET(pf_swi_cookie)
@@ -2308,7 +2331,7 @@ extern void			 pf_unload_vnet_purge(void);
 extern void			 pf_intr(void *);
 extern void			 pf_purge_expired_src_nodes(void);
 
-extern int			 pf_unlink_state(struct pf_kstate *);
+extern int			 pf_remove_state(struct pf_kstate *);
 extern int			 pf_state_insert(struct pfi_kkif *,
 				    struct pfi_kkif *,
 				    struct pf_state_key *,
@@ -2452,7 +2475,7 @@ void	pf_normalize_cleanup(void);
 int	pf_normalize_tcp(struct pf_pdesc *);
 void	pf_normalize_tcp_cleanup(struct pf_kstate *);
 int	pf_normalize_tcp_init(struct pf_pdesc *,
-	    struct tcphdr *, struct pf_state_peer *, struct pf_state_peer *);
+	    struct tcphdr *, struct pf_state_peer *);
 int	pf_normalize_tcp_stateful(struct pf_pdesc *,
 	    u_short *, struct tcphdr *, struct pf_kstate *,
 	    struct pf_state_peer *, struct pf_state_peer *, int *);

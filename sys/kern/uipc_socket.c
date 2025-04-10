@@ -1862,14 +1862,22 @@ sofree(struct socket *so)
 	if (pr->pr_detach != NULL)
 		pr->pr_detach(so);
 
-	/*
-	 * From this point on, we assume that no other references to this
-	 * socket exist anywhere else in the stack.  Therefore, no locks need
-	 * to be acquired or held.
-	 */
 	if (!(pr->pr_flags & PR_SOCKBUF) && !SOLISTENING(so)) {
+		/*
+		 * From this point on, we assume that no other references to
+		 * this socket exist anywhere else in the stack.  Therefore,
+		 * no locks need to be acquired or held.
+		 */
+#ifdef INVARIANTS
+		SOCK_SENDBUF_LOCK(so);
+		SOCK_RECVBUF_LOCK(so);
+#endif
 		sbdestroy(so, SO_SND);
 		sbdestroy(so, SO_RCV);
+#ifdef INVARIANTS
+		SOCK_SENDBUF_UNLOCK(so);
+		SOCK_RECVBUF_UNLOCK(so);
+#endif
 	}
 	seldrain(&so->so_rdsel);
 	seldrain(&so->so_wrsel);
@@ -3796,10 +3804,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 	CURVNET_SET(so->so_vnet);
 	error = 0;
 	if (sopt->sopt_level != SOL_SOCKET) {
-		if (so->so_proto->pr_ctloutput != NULL)
-			error = (*so->so_proto->pr_ctloutput)(so, sopt);
-		else
-			error = ENOPROTOOPT;
+		error = (*so->so_proto->pr_ctloutput)(so, sopt);
 	} else {
 		switch (sopt->sopt_name) {
 		case SO_ACCEPTFILTER:
@@ -4009,7 +4014,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = ENOPROTOOPT;
 			break;
 		}
-		if (error == 0 && so->so_proto->pr_ctloutput != NULL)
+		if (error == 0)
 			(void)(*so->so_proto->pr_ctloutput)(so, sopt);
 	}
 bad:
@@ -4060,10 +4065,7 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 	CURVNET_SET(so->so_vnet);
 	error = 0;
 	if (sopt->sopt_level != SOL_SOCKET) {
-		if (so->so_proto->pr_ctloutput != NULL)
-			error = (*so->so_proto->pr_ctloutput)(so, sopt);
-		else
-			error = ENOPROTOOPT;
+		error = (*so->so_proto->pr_ctloutput)(so, sopt);
 		CURVNET_RESTORE();
 		return (error);
 	} else {

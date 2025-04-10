@@ -214,7 +214,7 @@ struct stat32 {
 	ino_t st_ino;
 	nlink_t st_nlink;
 	mode_t	st_mode;
-	uint16_t st_padding0;
+	uint16_t st_bsdflags;
 	uid_t	st_uid;
 	gid_t	st_gid;
 	uint32_t st_padding1;
@@ -446,7 +446,7 @@ struct kinfo_vm_layout32 {
 	uint32_t	kvm_spare[12];
 };
 
-#if defined(_WANT_KEVENT32) || (defined(_KERNEL) && defined(__LP64__))
+#if defined(_WANT_KEVENT32) || defined(_KERNEL)
 struct kinfo_knote32 {
 	int		knt_kq_fd;
 	struct kevent32	knt_event;

@@ -1597,16 +1597,21 @@ retry:
 		}
 
 		/*
-		 * The page was left invalid.  Likely placed there by
+		 * If the page was left invalid, it was likely placed there by
 		 * an incomplete fault.  Just remove and ignore.
+		 *
+		 * One other possibility is that the map entry is wired, in
+		 * which case we must hang on to the page to avoid leaking it,
+		 * as the map entry owns the wiring.  This case can arise if the
+		 * backing object is truncated by the pager.
 		 */
-		if (vm_page_none_valid(m)) {
+		if (vm_page_none_valid(m) && entry->wired_count == 0) {
 			if (vm_page_iter_remove(&pages, m))
 				vm_page_free(m);
 			continue;
 		}
 
-		/* vm_page_iter_rename() will dirty the page. */
+		/* vm_page_iter_rename() will dirty the page if it is valid. */
 		if (!vm_page_iter_rename(&pages, m, new_object, m->pindex -
 		    offidxstart)) {
 			vm_page_xunbusy(m);
@@ -2485,10 +2490,8 @@ vm_object_list_handler(struct sysctl_req *req, bool swap_only)
 	struct vattr va;
 	vm_object_t obj;
 	vm_page_t m;
-	struct cdev *cdev;
-	struct cdevsw *csw;
 	u_long sp;
-	int count, error, ref;
+	int count, error;
 	key_t key;
 	unsigned short seq;
 	bool want_path;
@@ -2577,17 +2580,9 @@ vm_object_list_handler(struct sysctl_req *req, bool swap_only)
 			sp = swap_pager_swapped_pages(obj);
 			kvo->kvo_swapped = sp > UINT32_MAX ? UINT32_MAX : sp;
 		}
-		if ((obj->type == OBJT_DEVICE || obj->type == OBJT_MGTDEVICE) &&
-		    (obj->flags & OBJ_CDEVH) != 0) {
-			cdev = obj->un_pager.devp.handle;
-			if (cdev != NULL) {
-				csw = dev_refthread(cdev, &ref);
-				if (csw != NULL) {
-					strlcpy(kvo->kvo_path, cdev->si_name,
-					    sizeof(kvo->kvo_path));
-					dev_relthread(cdev, ref);
-				}
-			}
+		if (obj->type == OBJT_DEVICE || obj->type == OBJT_MGTDEVICE) {
+			cdev_pager_get_path(obj, kvo->kvo_path,
+			    sizeof(kvo->kvo_path));
 		}
 		VM_OBJECT_RUNLOCK(obj);
 		if ((obj->flags & OBJ_SYSVSHM) != 0) {
