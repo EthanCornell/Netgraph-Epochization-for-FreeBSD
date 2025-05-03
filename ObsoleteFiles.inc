@@ -85,7 +85,7 @@ OLD_FILES+=usr/tests/sys/vm/stack/.debug/libsoxstack.so.debug
 OLD_DIRS+=usr/tests/sys/vm/stack/.debug
 
 # 20250129: libdevinfo bumped to version 7
-OLD_LIBS+=lib/libdevinfo.so.6
+OLD_LIBS+=usr/lib/libdevinfo.so.6
 
 # 20250123: Remove gvinum(8)
 OLD_FILES+=sbin/gvinum
@@ -15409,8 +15409,6 @@ OLD_FILES+=usr/share/man/man4/lindev.4.gz
 # 20140425
 OLD_FILES+=usr/lib/libssp_p.a
 OLD_FILES+=usr/lib/libstand_p.a
-# 20140413: Removed NO_MANCOMPRESS from mount_fusefs
-OLD_FILES+=usr/share/man/man8/mount_fusefs.8
 # 20140314: AppleTalk
 OLD_DIRS+=usr/include/netatalk
 OLD_FILES+=usr/include/netatalk/aarp.h
