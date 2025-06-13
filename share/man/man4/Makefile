@@ -151,6 +151,7 @@ MAN=	aac.4 \
 	eventtimers.4 \
 	exca.4 \
 	ext2fs.4 \
+	e6000sw.4 \
 	e6060sw.4 \
 	fd.4 \
 	fdc.4 \
@@ -243,6 +244,7 @@ MAN=	aac.4 \
 	${_io.4} \
 	${_ioat.4} \
 	ip.4 \
+	ip17x.4 \
 	ip6.4 \
 	ipfirewall.4 \
 	ipheth.4 \
@@ -288,6 +290,8 @@ MAN=	aac.4 \
 	linprocfs.4 \
 	linsysfs.4 \
 	${_linux.4} \
+	${_linuxkpi.4} \
+	${_linuxkpi_wlan.4} \
 	liquidio.4 \
 	lm75.4 \
 	lo.4 \
@@ -339,6 +343,7 @@ MAN=	aac.4 \
 	msdosfs.4 \
 	msk.4 \
 	mtio.4 \
+	mtkswitch.4 \
 	multicast.4 \
 	muge.4 \
 	mvs.4 \
@@ -926,6 +931,8 @@ _gve.4=		gve.4
 _if_vmx.4=	if_vmx.4
 _ipmi.4=	ipmi.4
 _linux.4=	linux.4
+_linuxkpi.4=	linuxkpi.4
+_linuxkpi_wlan.4= linuxkpi_wlan.4
 _ossl.4=	ossl.4
 _pvscsi.4=	pvscsi.4
 _vmx.4=		vmx.4

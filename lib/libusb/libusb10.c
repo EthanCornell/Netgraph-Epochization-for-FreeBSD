@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2009 Sylvestre Gallon. All rights reserved.
  * Copyright (c) 2009-2023 Hans Petter Selasky
+ * Copyright (c) 2024 Aymeric Wibo
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,6 +40,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/eventfd.h>
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/queue.h>
@@ -118,15 +120,13 @@ libusb_set_nonblocking(int f)
 void
 libusb_interrupt_event_handler(libusb_context *ctx)
 {
-	uint8_t dummy;
 	int err;
 
 	if (ctx == NULL)
 		return;
 
-	dummy = 0;
-	err = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
-	if (err < (int)sizeof(dummy)) {
+	err = eventfd_write(ctx->event, 1);
+	if (err < 0) {
 		/* ignore error, if any */
 		DPRINTF(ctx, LIBUSB_DEBUG_FUNCTION, "Waking up event loop failed!");
 	}
@@ -145,7 +145,6 @@ libusb_init_context(libusb_context **context,
 	struct libusb_context *ctx;
 	pthread_condattr_t attr;
 	char *debug, *ep;
-	int ret;
 
 	if (num_options < 0)
 		return (LIBUSB_ERROR_INVALID_PARAM);
@@ -234,19 +233,16 @@ libusb_init_context(libusb_context **context,
 	ctx->ctx_handler = NO_THREAD;
 	ctx->hotplug_handler = NO_THREAD;
 
-	ret = pipe(ctx->ctrl_pipe);
-	if (ret < 0) {
+	ctx->event = eventfd(0, EFD_NONBLOCK);
+	if (ctx->event < 0) {
 		pthread_mutex_destroy(&ctx->ctx_lock);
 		pthread_mutex_destroy(&ctx->hotplug_lock);
 		pthread_cond_destroy(&ctx->ctx_cond);
 		free(ctx);
 		return (LIBUSB_ERROR_OTHER);
 	}
-	/* set non-blocking mode on the control pipe to avoid deadlock */
-	libusb_set_nonblocking(ctx->ctrl_pipe[0]);
-	libusb_set_nonblocking(ctx->ctrl_pipe[1]);
 
-	libusb10_add_pollfd(ctx, &ctx->ctx_poll, NULL, ctx->ctrl_pipe[0], POLLIN);
+	libusb10_add_pollfd(ctx, &ctx->ctx_poll, NULL, ctx->event, POLLIN);
 
 	pthread_mutex_lock(&default_context_lock);
 	if (usbi_default_context == NULL) {
@@ -296,8 +292,7 @@ libusb_exit(libusb_context *ctx)
 	/* XXX cleanup devices */
 
 	libusb10_remove_pollfd(ctx, &ctx->ctx_poll);
-	close(ctx->ctrl_pipe[0]);
-	close(ctx->ctrl_pipe[1]);
+	close(ctx->event);
 	pthread_mutex_destroy(&ctx->ctx_lock);
 	pthread_mutex_destroy(&ctx->hotplug_lock);
 	pthread_cond_destroy(&ctx->ctx_cond);
@@ -317,9 +312,9 @@ ssize_t
 libusb_get_device_list(libusb_context *ctx, libusb_device ***list)
 {
 	struct libusb20_backend *usb_backend;
-	struct libusb20_device *pdev;
+	struct libusb20_device *pdev, *parent_dev;
 	struct libusb_device *dev;
-	int i;
+	int i, j, k;
 
 	ctx = GET_CONTEXT(ctx);
 
@@ -371,6 +366,9 @@ libusb_get_device_list(libusb_context *ctx, libusb_device ***list)
 		/* set context we belong to */
 		dev->ctx = ctx;
 
+		/* assume we have no parent by default */
+		dev->parent_dev = NULL;
+
 		/* link together the two structures */
 		dev->os_priv = pdev;
 		pdev->privLuData = dev;
@@ -379,6 +377,25 @@ libusb_get_device_list(libusb_context *ctx, libusb_device ***list)
 		i++;
 	}
 	(*list)[i] = NULL;
+
+	/* for each device, find its parent */
+	for (j = 0; j < i; j++) {
+		pdev = (*list)[j]->os_priv;
+
+		for (k = 0; k < i; k++) {
+			if (k == j)
+				continue;
+
+			parent_dev = (*list)[k]->os_priv;
+
+			if (parent_dev->bus_number != pdev->bus_number)
+				continue;
+			if (parent_dev->device_address == pdev->parent_address) {
+				(*list)[j]->parent_dev = libusb_ref_device((*list)[k]);
+				break;
+			}
+		}
+	}
 
 	libusb20_be_free(usb_backend);
 	return (i);
@@ -451,6 +468,8 @@ libusb_get_device_speed(libusb_device *dev)
 		return (LIBUSB_SPEED_HIGH);
 	case LIBUSB20_SPEED_SUPER:
 		return (LIBUSB_SPEED_SUPER);
+	case LIBUSB20_SPEED_SUPER_PLUS:
+		return (LIBUSB_SPEED_SUPER_PLUS);
 	default:
 		break;
 	}
@@ -544,6 +563,7 @@ libusb_unref_device(libusb_device *dev)
 	CTX_UNLOCK(dev->ctx);
 
 	if (dev->refcnt == 0) {
+		libusb_unref_device(dev->parent_dev);
 		libusb20_dev_free(dev->os_priv);
 		free(dev);
 	}
@@ -820,6 +840,12 @@ libusb_set_interface_alt_setting(struct libusb20_device *pdev,
 	return (err ? LIBUSB_ERROR_OTHER : 0);
 }
 
+libusb_device *
+libusb_get_parent(libusb_device *dev)
+{
+	return (dev->parent_dev);
+}
+
 static struct libusb20_transfer *
 libusb10_get_transfer(struct libusb20_device *pdev,
     uint8_t endpoint, uint8_t xfer_index)
@@ -1079,6 +1105,9 @@ libusb10_get_buffsize(struct libusb20_device *pdev, libusb_transfer *xfer)
 			break;
 		case LIBUSB20_SPEED_SUPER:
 			ret = 65536;
+			break;
+		case LIBUSB20_SPEED_SUPER_PLUS:
+			ret = 131072;
 			break;
 		default:
 			ret = 16384;

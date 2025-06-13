@@ -37,6 +37,10 @@ bool gve_disable_hw_lro = false;
 SYSCTL_BOOL(_hw_gve, OID_AUTO, disable_hw_lro, CTLFLAG_RDTUN,
     &gve_disable_hw_lro, 0, "Controls if hardware LRO is used");
 
+bool gve_allow_4k_rx_buffers = false;
+SYSCTL_BOOL(_hw_gve, OID_AUTO, allow_4k_rx_buffers, CTLFLAG_RDTUN,
+    &gve_allow_4k_rx_buffers, 0, "Controls if 4K RX Buffers are allowed");
+
 char gve_queue_format[8];
 SYSCTL_STRING(_hw_gve, OID_AUTO, queue_format, CTLFLAG_RD,
     &gve_queue_format, 0, "Queue format being used by the iface");
@@ -168,7 +172,7 @@ gve_setup_txq_sysctl(struct sysctl_ctx_list *ctx,
 	    &stats->tx_delayed_pkt_tsoerr,
 	    "TSO packets delayed due to err in prep errors");
 	SYSCTL_ADD_COUNTER_U64(ctx, tx_list, OID_AUTO,
-	    "tx_mbuf_collpase", CTLFLAG_RD,
+	    "tx_mbuf_collapse", CTLFLAG_RD,
 	    &stats->tx_mbuf_collapse,
 	    "tx mbufs that had to be collapsed");
 	SYSCTL_ADD_COUNTER_U64(ctx, tx_list, OID_AUTO,
@@ -187,6 +191,10 @@ gve_setup_txq_sysctl(struct sysctl_ctx_list *ctx,
 	    "tx_mbuf_dmamap_err", CTLFLAG_RD,
 	    &stats->tx_mbuf_dmamap_err,
 	    "tx mbufs that could not be dma-mapped");
+	SYSCTL_ADD_COUNTER_U64(ctx, tx_list, OID_AUTO,
+	    "tx_timeout", CTLFLAG_RD,
+	    &stats->tx_timeout,
+	    "detections of timed out packets on tx queues");
 }
 
 static void

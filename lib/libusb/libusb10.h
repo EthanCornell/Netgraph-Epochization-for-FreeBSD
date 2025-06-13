@@ -106,7 +106,7 @@ typedef enum {
 struct libusb_context {
 	int	debug;
 	int	debug_fixed;
-	int	ctrl_pipe[2];
+	int	event;
 	int	tr_done_ref;
 	int	tr_done_gen;
 	usb_event_mode_t usb_event_mode;
@@ -142,6 +142,7 @@ struct libusb_device {
 	struct libusb_super_pollfd dev_poll;
 
 	struct libusb_context *ctx;
+	struct libusb_device *parent_dev;
 
 	TAILQ_ENTRY(libusb_device) hotplug_entry;
 

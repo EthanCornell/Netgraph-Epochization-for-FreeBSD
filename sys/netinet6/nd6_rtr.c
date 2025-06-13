@@ -520,7 +520,6 @@ nd6_ra_input(struct mbuf *m, int off, int icmp6len)
 			    ND_OPT_PI_FLAG_ONLINK) ? 1 : 0;
 			pr.ndpr_raf_auto = (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_AUTO) ? 1 : 0;
-			pr.ndpr_raf_ra_derived = 1;
 			pr.ndpr_plen = pi->nd_opt_pi_prefix_len;
 			pr.ndpr_vltime = ntohl(pi->nd_opt_pi_valid_time);
 			pr.ndpr_pltime = ntohl(pi->nd_opt_pi_preferred_time);
@@ -553,12 +552,8 @@ nd6_ra_input(struct mbuf *m, int off, int icmp6len)
 		maxmtu = (ndi->maxmtu && ndi->maxmtu < ifp->if_mtu)
 		    ? ndi->maxmtu : ifp->if_mtu;
 		if (mtu <= maxmtu) {
-			int change = (ndi->linkmtu != mtu);
-
-			ndi->linkmtu = mtu;
-			if (change) {
-				/* in6_maxmtu may change */
-				in6_setmaxmtu();
+			if (ndi->linkmtu != mtu) {
+				ndi->linkmtu = mtu;
 				rt_updatemtu(ifp);
 			}
 		} else {

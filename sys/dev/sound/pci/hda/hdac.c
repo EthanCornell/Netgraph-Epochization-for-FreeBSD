@@ -1278,6 +1278,7 @@ hdac_attach(device_t dev)
 		goto hdac_attach_fail;
 
 	/* Get Capabilities */
+	hdac_reset(sc, 1);
 	result = hdac_get_capabilities(sc);
 	if (result != 0)
 		goto hdac_attach_fail;
@@ -1636,6 +1637,35 @@ hdac_attach2(void *arg)
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev)), OID_AUTO,
 	    "polling", CTLTYPE_INT | CTLFLAG_RW, sc->dev,
 	    sizeof(sc->dev), sysctl_hdac_polling, "I", "Enable polling mode");
+}
+
+/****************************************************************************
+ * int hdac_shutdown(device_t)
+ *
+ * Power down HDA bus and codecs.
+ ****************************************************************************/
+static int
+hdac_shutdown(device_t dev)
+{
+	struct hdac_softc *sc = device_get_softc(dev);
+
+	HDA_BOOTHVERBOSE(
+		device_printf(dev, "Shutdown...\n");
+	);
+	callout_drain(&sc->poll_callout);
+	taskqueue_drain(taskqueue_thread, &sc->unsolq_task);
+	bus_generic_shutdown(dev);
+
+	hdac_lock(sc);
+	HDA_BOOTHVERBOSE(
+		device_printf(dev, "Reset controller...\n");
+	);
+	hdac_reset(sc, false);
+	hdac_unlock(sc);
+	HDA_BOOTHVERBOSE(
+		device_printf(dev, "Shutdown done\n");
+	);
+	return (0);
 }
 
 /****************************************************************************
@@ -2148,6 +2178,7 @@ static device_method_t hdac_methods[] = {
 	DEVMETHOD(device_probe,		hdac_probe),
 	DEVMETHOD(device_attach,	hdac_attach),
 	DEVMETHOD(device_detach,	hdac_detach),
+	DEVMETHOD(device_shutdown,	hdac_shutdown),
 	DEVMETHOD(device_suspend,	hdac_suspend),
 	DEVMETHOD(device_resume,	hdac_resume),
 	/* Bus interface */
