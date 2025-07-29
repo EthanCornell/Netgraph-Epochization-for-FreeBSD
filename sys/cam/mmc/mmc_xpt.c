@@ -610,7 +610,6 @@ mmcprobe_start(struct cam_periph *periph, union ccb *start_ccb)
 		CAM_DEBUG(start_ccb->ccb_h.path, CAM_DEBUG_PROBE, ("Start with PROBE_RESET\n"));
 		/* FALLTHROUGH */
 	case PROBE_IDENTIFY:
-		xpt_path_inq(&start_ccb->cpi, periph->path);
 		CAM_DEBUG(start_ccb->ccb_h.path, CAM_DEBUG_PROBE, ("Start with PROBE_IDENTIFY\n"));
 		init_standard_ccb(start_ccb, XPT_MMC_GET_TRAN_SETTINGS);
 		break;
@@ -1213,9 +1212,9 @@ mmc_path_inq(struct ccb_pathinq *cpi, const char *hba,
 	cpi->max_lun = 0;
 	cpi->initiator_id = 1;
 	cpi->maxio = maxio;
-	strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-	strncpy(cpi->hba_vid, hba, HBA_IDLEN);
-	strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
+	strlcpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
+	strlcpy(cpi->hba_vid, hba, HBA_IDLEN);
+	strlcpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
 	cpi->unit_number = cam_sim_unit(sim);
 	cpi->bus_id = cam_sim_bus(sim);
 	cpi->protocol = PROTO_MMCSD;

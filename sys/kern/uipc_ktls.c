@@ -595,8 +595,6 @@ start:
 	return (error);
 }
 
-uint64_t ktls_glob_gen = 1;
-
 static int
 ktls_create_session(struct socket *so, struct tls_enable *en,
     struct ktls_session **tlsp, int direction)
@@ -821,8 +819,7 @@ ktls_create_session(struct socket *so, struct tls_enable *en,
 			arc4rand(tls->params.iv + 8, sizeof(uint64_t), 0);
 	}
 
-	atomic_thread_fence_rel();
-	tls->gen = atomic_fetchadd_64(&ktls_glob_gen, 1);
+	tls->gen = 0;
 	*tlsp = tls;
 	return (0);
 }
@@ -865,8 +862,7 @@ ktls_clone_session(struct ktls_session *tls, int direction)
 	memcpy(tls_new->params.cipher_key, tls->params.cipher_key,
 	    tls->params.cipher_key_len);
 
-	atomic_thread_fence_rel();
-	tls_new->gen = atomic_fetchadd_64(&ktls_glob_gen, 1);
+	tls_new->gen = 0;
 	return (tls_new);
 }
 
@@ -1211,7 +1207,7 @@ sb_mark_notready(struct sockbuf *sb)
 	for (; m != NULL; m = m->m_next) {
 		KASSERT(m->m_nextpkt == NULL, ("%s: m_nextpkt != NULL",
 		    __func__));
-		KASSERT((m->m_flags & M_NOTAVAIL) == 0, ("%s: mbuf not avail",
+		KASSERT((m->m_flags & M_NOTREADY) == 0, ("%s: mbuf not ready",
 		    __func__));
 		KASSERT(sb->sb_acc >= m->m_len, ("%s: sb_acc < m->m_len",
 		    __func__));
@@ -1945,8 +1941,6 @@ ktls_destroy(struct ktls_session *tls)
 	bool wlocked;
 
 	MPASS(tls->refcount == 0);
-
-	atomic_add_acq_64(&ktls_glob_gen, 1);
 
 	inp = tls->inp;
 	if (tls->tx) {
